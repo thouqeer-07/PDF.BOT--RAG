@@ -1,0 +1,9 @@
+langchain>=0.2.10
+langchain-huggingface
+langchain-community>=0.2.10
+langchain-google-genai>=0.0.9
+faiss-cpu>=1.8.0.post1
+pypdf>=4.2.0
+sentence-transformers>=2.7.0
+python-dotenv>=1.0.1
+google-generativeai
