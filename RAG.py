@@ -24,7 +24,7 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 # Hard-coded PDF path (your file)
-PDF_PATH = r"C:\Users\thouq\OneDrive\Intern project RAG\1. Self-Help Author Samuel Smiles.pdf"
+PDF_PATH = "1. Self-Help Author Samuel Smiles.pdf"
 PDF_NAME = pathlib.Path(PDF_PATH).name
 
 # =========================
@@ -34,7 +34,7 @@ def load_doc(path):
     return PyPDFLoader(path).load()
 
 def split_doc(pages):
-    return RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100).split_documents(pages)
+    return RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100).split_documents(pages)
 
 # =========================
 # 2. OLLAMA EMBEDDINGS
@@ -54,8 +54,7 @@ class OllamaEmbeddings(Embeddings):
         r = requests.post(self.url, json={"model": self.model, "input": texts})
         if r.status_code == 200 and "embeddings" in r.json():
             return r.json()["embeddings"]
-        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
-
+        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")    
     def embed_query(self, text):
         return self._get_embedding(text)
 
