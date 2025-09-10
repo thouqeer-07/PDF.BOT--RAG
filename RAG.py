@@ -1,95 +1,98 @@
-# =========================
-# 1. DOCUMENT LOADING
-# =========================
 import os
 import pathlib
-import pickle
+import streamlit as st
+import google.generativeai as genai
+import requests
 import numpy as np
 from dotenv import load_dotenv
-import requests
+
 from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings.base import Embeddings
+from langchain.prompts import PromptTemplate
+from langchain_community.vectorstores import Qdrant
+from qdrant_client import QdrantClient
+
+# =========================
+# 0. ENV + GLOBALS
+# =========================
 load_dotenv()
 INDEX_DIR = pathlib.Path("./index")
 INDEX_DIR.mkdir(exist_ok=True)
-def load_doc(pdf_path):
-    loader = PyPDFLoader(pdf_path)  
-    return loader.load()
-# =========================
-# 2. DOCUMENT SPLITTING
-# =========================
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-def split_doc(pages):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
-    return splitter.split_documents(pages)
-# =========================
-# 3. VECTORSTORES & EMBEDDINGS
-# =========================
-from langchain_community.vectorstores import FAISS
-from langchain.embeddings.base import Embeddings
 
+QDRANT_URL = os.getenv("QDRANT_URL")   
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Hard-coded PDF path (your file)
+PDF_PATH = r"C:\Users\thouq\OneDrive\Intern project RAG\1. Self-Help Author Samuel Smiles.pdf"
+PDF_NAME = pathlib.Path(PDF_PATH).name
+
+# =========================
+# 1. DOC LOADING + SPLITTING
+# =========================
+def load_doc(path):
+    return PyPDFLoader(path).load()
+
+def split_doc(pages):
+    return RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100).split_documents(pages)
+
+# =========================
+# 2. OLLAMA EMBEDDINGS
+# =========================
 class OllamaEmbeddings(Embeddings):
     def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
         self.model = model
         self.url = url
 
-    def _get_embedding(self, text: str):    
-        payload = {"model": self.model, "input": text}
-        response = requests.post(self.url, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            return data["embeddings"][0] if "embeddings" in data else None
-        raise RuntimeError(f"Ollama API error {response.status_code}: {response.text}")
+    def _get_embedding(self, text):
+        r = requests.post(self.url, json={"model": self.model, "input": text})
+        if r.status_code == 200 and "embeddings" in r.json():
+            return r.json()["embeddings"][0]
+        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
 
     def embed_documents(self, texts):
-        payload = {"model": self.model, "input": texts}
-        response = requests.post(self.url, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            return data["embeddings"] if "embeddings" in data else None
-        raise RuntimeError(f"Ollama API error {response.status_code}: {response.text}")
+        r = requests.post(self.url, json={"model": self.model, "input": texts})
+        if r.status_code == 200 and "embeddings" in r.json():
+            return r.json()["embeddings"]
+        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
 
     def embed_query(self, text):
         return self._get_embedding(text)
 
+# =========================
+# 3. BUILD OR LOAD INDEX (QDRANT CLOUD)
+# =========================
 def build_or_load_index(pdf_path, rebuild=False):
-    index_fp = INDEX_DIR / ("faiss_" + pathlib.Path(pdf_path).stem.replace(" ", "_"))
-    store_fp = index_fp.with_suffix(".pkl")
-    emb_cache_fp = INDEX_DIR / (pathlib.Path(pdf_path).stem.replace(" ", "_") + "_embeddings.npy")
+    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
+
+    qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
     embeddings = OllamaEmbeddings()
 
-    if not rebuild and index_fp.exists() and store_fp.exists():
-        vectorstore = FAISS.load_local(str(index_fp), embeddings, allow_dangerous_deserialization=True)
-        test_vec = embeddings.embed_query("test")
-        if len(test_vec) == vectorstore.index.d:
-            return vectorstore
+    # Reuse collection if already exists
+    collections = [c.name for c in qdrant_client.get_collections().collections]
+    if not rebuild and collection_name in collections:
+        return Qdrant(client=qdrant_client, collection_name=collection_name, embeddings=embeddings)
 
-    # Load and split PDF
+    # Otherwise, load and embed
     pages = load_doc(pdf_path)
-    splits = split_doc(pages)
+    chunks = split_doc(pages)
 
-    # Compute or load embeddings
-    if emb_cache_fp.exists():
-        embeddings_list = np.load(emb_cache_fp, allow_pickle=True)
-    else:
-        embeddings_list = embeddings.embed_documents([d.page_content for d in splits])
-        np.save(emb_cache_fp, embeddings_list)
-
-    # Store in FAISS
-    vectorstore = FAISS.from_documents(splits, embeddings)
-    vectorstore.save_local(str(index_fp))
-    with open(store_fp, "wb") as f:
-        pickle.dump(vectorstore.index_to_docstore_id, f)
-    return vectorstore
+    return Qdrant.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
+        collection_name=collection_name,
+    )
 
 # =========================
-# 4. RETRIEVAL
+# 4. PROMPT
 # =========================
-from langchain.prompts import PromptTemplate
-
-SYSTEM_PROMPT = """You are a precise, concise assistant. 
-Answer strictly based on the retrieved context.
-If the answer is not in the context, say you don't know based on the provided PDF.
-"""
+SYSTEM_PROMPT = (
+    "You are a precise, concise assistant.\n"
+    "Answer strictly based on the retrieved context.\n"
+    "If the answer is not in the context, say you don't know based on the provided PDF.\n"
+)
 
 QA_TEMPLATE = """{system}
 # Context:
@@ -99,9 +102,6 @@ QA_TEMPLATE = """{system}
 # Instructions:
 - Answer in 2-5 sentences unless the user asks for more detail.
 """
-
-def get_retriever(vectorstore):
-    return vectorstore.as_retriever(search_kwargs={"k": 4})
 
 def get_prompt():
     return PromptTemplate(
@@ -113,13 +113,10 @@ def get_prompt():
 # =========================
 # 5. STREAMLIT UI
 # =========================
-import streamlit as st
-import google.generativeai as genai
 st.set_page_config(page_title="RAG Chatbot", layout="wide")
 st.markdown("<h1 style='text-align:center;color:Gold;'>📚 PDF Chatbot Assistant</h1>", unsafe_allow_html=True)
-st.markdown("<h4 style='text-align:center; color:Brown;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
+st.markdown("<h4 style='text-align:center;color:Brown;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
 
-# Initialize session state
 if "pdf_chats" not in st.session_state:
     st.session_state.pdf_chats = {}
 if "selected_pdf" not in st.session_state:
@@ -129,35 +126,26 @@ if "vectorstores" not in st.session_state:
 if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 
-# Sidebar PDF upload and history
-uploaded_file = st.sidebar.file_uploader("Upload a PDF", type=["pdf"])
-if uploaded_file:
-    pdf_name = uploaded_file.name
-    pdf_path = INDEX_DIR / pdf_name
-    with open(pdf_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    if pdf_name not in st.session_state.vectorstores:
-        vectordb = build_or_load_index(pdf_path, rebuild=False)
-        st.session_state.vectorstores[pdf_name] = vectordb
-        st.session_state.pdf_chats[pdf_name] = []
-    st.session_state.selected_pdf = pdf_name
-    st.sidebar.success(f"✅ {pdf_name} loaded!")
+# Always load your hard-coded PDF
+if PDF_NAME not in st.session_state.vectorstores:
+    vectordb = build_or_load_index(PDF_PATH, rebuild=False)
+    st.session_state.vectorstores[PDF_NAME] = vectordb
+    st.session_state.pdf_chats[PDF_NAME] = []
 
-st.sidebar.markdown("### PDF History")
-for pdf_name in st.session_state.pdf_chats.keys():
-    if st.sidebar.button(pdf_name):
-        st.session_state.selected_pdf = pdf_name
+st.session_state.selected_pdf = PDF_NAME
+st.sidebar.success(f"✅ {PDF_NAME} loaded!")
 
-# Chat logic
+# =========================
+# 6. CHAT HANDLER
+# =========================
 def send_message():
     user_input = st.session_state.input_text.strip()
     if not user_input:
         return
 
-    # Friendly replies              
-    greetings = {"hi","hello","hey","hiya","hii"}
-    farewells = {"bye","goodbye","exit","quit"}
-    thanks = {"thanks","thank you","thx"}
+    greetings = {"hi", "hello", "hey", "hiya", "hii"}
+    farewells = {"bye", "goodbye", "exit", "quit"}
+    thanks = {"thanks", "thank you", "thx"}
 
     if user_input.lower() in greetings:
         bot_reply = "Hello! 👋 How can I help you today?"
@@ -167,24 +155,18 @@ def send_message():
         bot_reply = "You're welcome! 😊"
     else:
         vectordb = st.session_state.vectorstores[st.session_state.selected_pdf]
-        retriever = get_retriever(vectordb)
+        retriever = vectordb.as_retriever(search_kwargs={"k": 4})
 
-        # Configure Gemini API
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         model = genai.GenerativeModel("gemini-2.0-flash")
 
-        # Build prompt
-        prompt = get_prompt()
         with st.spinner("🤖 Thinking..."):
             docs = retriever.get_relevant_documents(user_input)
             context = "\n\n".join([d.page_content for d in docs])
-            final_prompt = prompt.format(context=context, question=user_input)
-
-            # Call Gemini API
-            response = model.generate_content(final_prompt)
+            prompt = get_prompt().format(context=context, question=user_input)
+            response = model.generate_content(prompt)
             bot_reply = response.text.strip()
 
-    # Append messages
     st.session_state.pdf_chats[st.session_state.selected_pdf].append(
         {"role": "user", "content": user_input}
     )
@@ -193,37 +175,28 @@ def send_message():
     )
     st.session_state.input_text = ""
 
-
 # =========================
-# CHAT INTERFACE
+# 7. RENDER CHAT
 # =========================
 if st.session_state.selected_pdf:
-    pdf_name = st.session_state.selected_pdf
-    st.markdown(f"<h3 style='color:purple;'>Chat Interface - {pdf_name}</h3>", unsafe_allow_html=True)
+    name = st.session_state.selected_pdf
+    st.markdown(f"<h3 style='color:purple;'>Chat Interface - {name}</h3>", unsafe_allow_html=True)
+    chat = st.session_state.pdf_chats[name]
 
-    chats = st.session_state.pdf_chats[pdf_name]
-
-    # Display chat bubbles
-    for msg in chats:
-        if msg["role"]=="user":
-            st.markdown(f"""
-            <div style="display:flex; justify-content:flex-end; margin:5px 0;">
-                <div style="background-color:lightblue; color:#000; padding:12px; border-radius:12px; max-width:70%; font-size:16px; line-height:1.5; word-wrap:break-word;">
-                    {msg['content']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    for msg in chat:
+        if msg["role"] == "user":
+            st.markdown(
+                f"<div style='display:flex;justify-content:flex-end;margin:5px 0;'>"
+                f"<div style='background-color:lightblue;color:#000;padding:12px;border-radius:12px;max-width:70%;"
+                f"font-size:16px;line-height:1.5;word-wrap:break-word;'>{msg['content']}</div></div>",
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown(f"""
-            <div style="display:flex; justify-content:flex-start; margin:5px 0;">
-                <div style="background-color:#F1F0F0; color:#000; padding:12px; border-radius:12px; max-width:70%; font-size:16px; line-height:1.5; word-wrap:break-word;">
-                    {msg['content']}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='display:flex;justify-content:flex-start;margin:5px 0;'>"
+                f"<div style='background-color:#F1F0F0;color:#000;padding:12px;border-radius:12px;max-width:70%;"
+                f"font-size:16px;line-height:1.5;word-wrap:break-word;'>{msg['content']}</div></div>",
+                unsafe_allow_html=True,
+            )
 
     st.text_input("Type your question here...", key="input_text", on_change=send_message)
-else:
-    st.write("Please upload or select a PDF to start chatting.")
-
-
