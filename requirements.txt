@@ -7,3 +7,5 @@ pypdf>=4.2.0
 sentence-transformers>=2.7.0
 python-dotenv>=1.0.1
 google-generativeai
+streamlit
+qdrant-client
