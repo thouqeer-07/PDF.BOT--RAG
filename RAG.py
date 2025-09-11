@@ -2,16 +2,12 @@ import os
 import pathlib
 import streamlit as st
 import google.generativeai as genai
-import requests
-import numpy as np
 from dotenv import load_dotenv
-
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.base import Embeddings
 from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import Qdrant
 from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct, VectorParams, Distance
 
 # =========================
 # 0. ENV + GLOBALS
@@ -20,12 +16,14 @@ load_dotenv()
 INDEX_DIR = pathlib.Path("./index")
 INDEX_DIR.mkdir(exist_ok=True)
 
-QDRANT_URL = os.getenv("QDRANT_URL")   
+QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# Hard-coded PDF path (your file)
 PDF_PATH = "1. Self-Help Author Samuel Smiles.pdf"
 PDF_NAME = pathlib.Path(PDF_PATH).name
+
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # =========================
 # 1. DOC LOADING + SPLITTING
@@ -34,55 +32,70 @@ def load_doc(path):
     return PyPDFLoader(path).load()
 
 def split_doc(pages):
-    return RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100).split_documents(pages)
+    return RecursiveCharacterTextSplitter(
+        chunk_size=500, chunk_overlap=100
+    ).split_documents(pages)
 
 # =========================
-# 2. OLLAMA EMBEDDINGS
+# 2. GEMINI EMBEDDINGS (no LangChain)
 # =========================
-class OllamaEmbeddings(Embeddings):
-    def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
+class GeminiEmbeddings:
+    def __init__(self, model="models/embedding-001"):
         self.model = model
-        self.url = url
-
-    def _get_embedding(self, text):
-        r = requests.post(self.url, json={"model": self.model, "input": text})
-        if r.status_code == 200 and "embeddings" in r.json():
-            return r.json()["embeddings"][0]
-        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
 
     def embed_documents(self, texts):
-        r = requests.post(self.url, json={"model": self.model, "input": texts})
-        if r.status_code == 200 and "embeddings" in r.json():
-            return r.json()["embeddings"]
-        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")    
+        vectors = []
+        for t in texts:
+            resp = genai.embed_content(model=self.model, input=t)
+            vectors.append(resp["embedding"])
+        return vectors
+
     def embed_query(self, text):
-        return self._get_embedding(text)
+        resp = genai.embed_content(model=self.model, input=text)
+        return resp["embedding"]
+
+# helper
+def get_embeddings():
+    return GeminiEmbeddings()
 
 # =========================
 # 3. BUILD OR LOAD INDEX (QDRANT CLOUD)
 # =========================
 def build_or_load_index(pdf_path, rebuild=False):
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
+    qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    embeddings = get_embeddings()
 
-    qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-    embeddings = OllamaEmbeddings()
-
-    # Reuse collection if already exists
-    collections = [c.name for c in qdrant_client.get_collections().collections]
+    # check if collection exists
+    collections = [c.name for c in qdrant.get_collections().collections]
     if not rebuild and collection_name in collections:
-        return Qdrant(client=qdrant_client, collection_name=collection_name, embeddings=embeddings)
+        return qdrant, collection_name, embeddings
 
-    # Otherwise, load and embed
+    # otherwise create new collection
     pages = load_doc(pdf_path)
     chunks = split_doc(pages)
 
-    return Qdrant.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
+    vectors = embeddings.embed_documents([c.page_content for c in chunks])
+
+    # recreate collection
+    if collection_name in collections:
+        qdrant.delete_collection(collection_name=collection_name)
+
+    qdrant.recreate_collection(
         collection_name=collection_name,
+        vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
     )
+
+    # upload data
+    qdrant.upload_points(
+        collection_name=collection_name,
+        points=[
+            PointStruct(id=i, vector=vectors[i], payload={"text": chunks[i].page_content})
+            for i in range(len(chunks))
+        ],
+    )
+
+    return qdrant, collection_name, embeddings
 
 # =========================
 # 4. PROMPT
@@ -120,15 +133,14 @@ if "pdf_chats" not in st.session_state:
     st.session_state.pdf_chats = {}
 if "selected_pdf" not in st.session_state:
     st.session_state.selected_pdf = None
-if "vectorstores" not in st.session_state:
-    st.session_state.vectorstores = {}
+if "vectorstore" not in st.session_state:
+    st.session_state.vectorstore = None
 if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 
-# Always load your hard-coded PDF
-if PDF_NAME not in st.session_state.vectorstores:
-    vectordb = build_or_load_index(PDF_PATH, rebuild=False)
-    st.session_state.vectorstores[PDF_NAME] = vectordb
+if not st.session_state.vectorstore:
+    qdrant, collection, embeddings = build_or_load_index(PDF_PATH, rebuild=False)
+    st.session_state.vectorstore = (qdrant, collection, embeddings)
     st.session_state.pdf_chats[PDF_NAME] = []
 
 st.session_state.selected_pdf = PDF_NAME
@@ -142,29 +154,20 @@ def send_message():
     if not user_input:
         return
 
-    greetings = {"hi", "hello", "hey", "hiya", "hii"}
-    farewells = {"bye", "goodbye", "exit", "quit"}
-    thanks = {"thanks", "thank you", "thx"}
+    qdrant, collection, embeddings = st.session_state.vectorstore
+    query_vector = embeddings.embed_query(user_input)
 
-    if user_input.lower() in greetings:
-        bot_reply = "Hello! 👋 How can I help you today?"
-    elif user_input.lower() in farewells:
-        bot_reply = "Goodbye! 👋 Have a great day!"
-    elif user_input.lower() in thanks:
-        bot_reply = "You're welcome! 😊"
-    else:
-        vectordb = st.session_state.vectorstores[st.session_state.selected_pdf]
-        retriever = vectordb.as_retriever(search_kwargs={"k": 4})
+    search_result = qdrant.search(
+        collection_name=collection,
+        query_vector=query_vector,
+        limit=4,
+    )
 
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = genai.GenerativeModel("gemini-2.0-flash")
-
-        with st.spinner("🤖 Thinking..."):
-            docs = retriever.get_relevant_documents(user_input)
-            context = "\n\n".join([d.page_content for d in docs])
-            prompt = get_prompt().format(context=context, question=user_input)
-            response = model.generate_content(prompt)
-            bot_reply = response.text.strip()
+    context = "\n\n".join([hit.payload["text"] for hit in search_result])
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    prompt = get_prompt().format(context=context, question=user_input)
+    response = model.generate_content(prompt)
+    bot_reply = response.text.strip()
 
     st.session_state.pdf_chats[st.session_state.selected_pdf].append(
         {"role": "user", "content": user_input}
@@ -178,10 +181,7 @@ def send_message():
 # 7. RENDER CHAT
 # =========================
 if st.session_state.selected_pdf:
-    name = st.session_state.selected_pdf
-    st.markdown(f"<h3 style='color:purple;'>Chat Interface - {name}</h3>", unsafe_allow_html=True)
-    chat = st.session_state.pdf_chats[name]
-
+    chat = st.session_state.pdf_chats[st.session_state.selected_pdf]
     for msg in chat:
         if msg["role"] == "user":
             st.markdown(
