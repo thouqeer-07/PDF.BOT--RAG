@@ -70,10 +70,6 @@ if is_local():
 
         def embed_query(self, text):
             return self._get_embedding(text)
-def get_embeddings():
-    # Always use Gemini embeddings in Cloud
-    from langchain_google_genai import GoogleGenerativeAIEmbeddings
-    return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # =========================
 # 3. BUILD OR LOAD INDEX
@@ -83,51 +79,31 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
-from langchain_qdrant import QdrantVectorStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import os
-import pathlib
-
-def build_or_load_index(pdf_path, rebuild=False):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
-
+def build_or_load_index(pdf_path):
+    """
+    Only loads an existing collection from Qdrant.
+    Embeddings are already stored locally.
+    """
     qdrant_url = os.getenv("QDRANT_URL")
     qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
+    if not qdrant_url or not qdrant_api_key:
+        import streamlit as st
+        st.error("QDRANT_URL or QDRANT_API_KEY not set!")
+        return None
+
+    qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
+
     try:
-        if rebuild:
-            # Create a new collection from documents
-            from langchain_community.document_loaders import PyPDFLoader
-            from langchain.text_splitter import CharacterTextSplitter
-
-            def load_doc(path):
-                return PyPDFLoader(path).load()
-
-            def split_doc(pages):
-                splitter = CharacterTextSplitter(
-                    separator="\n", chunk_size=500, chunk_overlap=100
-                )
-                return splitter.split_documents(pages)
-
-            vectordb = QdrantVectorStore.from_documents(
-                documents=split_doc(load_doc(pdf_path)),
-                embedding=embeddings,
-                collection_name=collection_name,
-                location=qdrant_url,
-                api_key=qdrant_api_key,
-            )
-        else:
-            # Load existing collection
-            vectordb = QdrantVectorStore.from_existing_collection(
-                collection_name=collection_name,
-                embedding=embeddings,
-                location=qdrant_url,
-                api_key=qdrant_api_key,
-            )
+        vectordb = QdrantVectorStore.from_existing_collection(
+            collection_name=collection_name,
+            client=qdrant_client,   # pass the Qdrant client
+            embedding=None           # embedding not needed, data already stored
+        )
     except Exception as e:
         import streamlit as st
-        st.error(f"Failed to load or build Qdrant index: {e}")
+        st.error(f"Failed to load Qdrant index: {e}")
         return None
 
     return vectordb
