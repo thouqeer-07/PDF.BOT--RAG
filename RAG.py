@@ -39,39 +39,43 @@ def split_doc(pages):
 # =========================
 # 2. EMBEDDINGS (Local vs Cloud)
 # =========================
-import os, socket, requests
-from langchain.embeddings.base import Embeddings
+import os, socket
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.embeddings.base import Embeddings
 
-# Only define Ollama if running locally
-class OllamaEmbeddings(Embeddings):
-    def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
-        self.model = model
-        self.url = url
-
-    def _get_embedding(self, text):
-        r = requests.post(self.url, json={"model": self.model, "input": text})
-        r.raise_for_status()
-        return r.json()["embeddings"][0]
-
-    def embed_documents(self, texts):
-        r = requests.post(self.url, json={"model": self.model, "input": texts})
-        r.raise_for_status()
-        return r.json()["embeddings"]
-
-    def embed_query(self, text):
-        return self._get_embedding(text)
-
-
-def get_embeddings():
-    """Use Ollama locally, Gemini on Streamlit Cloud"""
+# Only define Ollama if localhost is reachable
+def is_local():
     try:
         socket.create_connection(("localhost", 11434), timeout=1)
-        return OllamaEmbeddings()
+        return True
     except Exception:
+        return False
+
+if is_local():
+    class OllamaEmbeddings(Embeddings):
+        """Local embedding generator using Ollama API"""
+        def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
+            self.model = model
+            self.url = url
+
+        def _get_embedding(self, text):
+            r = requests.post(self.url, json={"model": self.model, "input": text})
+            r.raise_for_status()
+            return r.json()["embeddings"][0]
+
+        def embed_documents(self, texts):
+            r = requests.post(self.url, json={"model": self.model, "input": texts})
+            r.raise_for_status()
+            return r.json()["embeddings"]
+
+        def embed_query(self, text):
+            return self._get_embedding(text)
+def get_embeddings():
+    if is_local():
+        return OllamaEmbeddings()
+    else:
+        # Streamlit Cloud → always use Gemini
         return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-
-
 
 # =========================
 # 3. BUILD OR LOAD INDEX
