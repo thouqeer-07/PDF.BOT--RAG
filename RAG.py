@@ -39,11 +39,11 @@ def split_doc(pages):
 # =========================
 # 2. EMBEDDINGS (Local vs Cloud)
 # =========================
-import os, socket
+import socket
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.embeddings.base import Embeddings
+import requests
 
-# Only define Ollama if localhost is reachable
 def is_local():
     try:
         socket.create_connection(("localhost", 11434), timeout=1)
@@ -75,15 +75,14 @@ def get_embeddings():
         return OllamaEmbeddings()
     else:
         # Streamlit Cloud → always use Gemini
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
         return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # =========================
 # 3. BUILD OR LOAD INDEX
 # =========================
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-import os
 
 def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(
@@ -91,10 +90,9 @@ def build_or_load_index(pdf_path, rebuild=False):
         api_key=os.getenv("QDRANT_API_KEY")
     )
 
-    # ✅ Always use Gemini embeddings in Streamlit Cloud
-    embeddings = get_embeddings()
+    embeddings = get_embeddings()  # safe selection
 
-    collection_name = "1._Self-Help_Author_Samuel_Smiles"
+    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
     return QdrantVectorStore(
         client=qdrant_client,
