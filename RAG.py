@@ -83,22 +83,32 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
-def build_or_load_index(pdf_path, rebuild=False):
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+import pathlib
+import os
+
+def build_or_load_index(pdf_path):
     qdrant_client = QdrantClient(
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_API_KEY")
     )
 
-    embeddings = get_embeddings()  # safe selection
+    # Gemini embeddings in Cloud
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
-    # If you already have a Qdrant collection, skip validation
-    return QdrantVectorStore(
+    # Initialize without forcing any dummy embedding
+    vectordb = QdrantVectorStore(
         client=qdrant_client,
         collection_name=collection_name,
         embedding=embeddings,
-        collection_config=None  # <-- avoids calling embed_documents()
     )
+
+    return vectordb
+
 
 # =========================
 # 4. PROMPT TEMPLATE
