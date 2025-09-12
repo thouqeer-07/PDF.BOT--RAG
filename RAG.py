@@ -37,9 +37,12 @@ def split_doc(pages):
     return splitter.split_documents(pages)
 
 # =========================
-# 2. OLLAMA EMBEDDINGS
+# 2. EMBEDDINGS (Local vs Cloud)
 # =========================
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
 class OllamaEmbeddings(Embeddings):
+    """Local embedding generator using Ollama API"""
     def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
         self.model = model
         self.url = url
@@ -59,30 +62,50 @@ class OllamaEmbeddings(Embeddings):
     def embed_query(self, text):
         return self._get_embedding(text)
 
+
 # =========================
 # 3. BUILD OR LOAD INDEX
 # =========================
 def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-    embeddings = OllamaEmbeddings()
 
-    collections = [c.name for c in qdrant_client.get_collections().collections]
-    if not rebuild and collection_name in collections:
-        return QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=embeddings)
+    # Detect environment: local vs cloud
+    running_in_cloud = os.getenv("STREAMLIT_RUNTIME", "false").lower() == "true"
 
-    # Load PDF, split, embed, and upload
-    pages = load_doc(pdf_path)
-    chunks = split_doc(pages)
+    if running_in_cloud:
+        # ✅ On Streamlit Cloud → only connect to existing collection
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        return QdrantVectorStore(
+            client=qdrant_client,
+            collection_name=collection_name,
+            embedding=embeddings
+        )
+    else:
+        # ✅ On local → build or reload using Ollama
+        embeddings = OllamaEmbeddings()
+        collections = [c.name for c in qdrant_client.get_collections().collections]
 
-    vectordb = QdrantVectorStore.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        collection_name=collection_name,
-        batch_size=16
-    )
-    return vectordb
+        if not rebuild and collection_name in collections:
+            return QdrantVectorStore(
+                client=qdrant_client,
+                collection_name=collection_name,
+                embedding=embeddings
+            )
+
+        # Build index locally with Ollama
+        pages = load_doc(pdf_path)
+        chunks = split_doc(pages)
+
+        vectordb = QdrantVectorStore.from_documents(
+            documents=chunks,
+            embedding=embeddings,
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY,
+            collection_name=collection_name,
+            batch_size=16
+        )
+        return vectordb
+
 
 # =========================
 # 4. PROMPT TEMPLATE
