@@ -78,15 +78,21 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 import pathlib
 import os
+
 from langchain.embeddings.base import Embeddings
+import numpy as np
 
 class DummyEmbeddings(Embeddings):
-    """Wrapper to satisfy QdrantVectorStore even if embeddings exist in DB."""
+    """Minimal embedding class to satisfy QdrantVectorStore initialization."""
+    
     def embed_documents(self, texts):
-        raise NotImplementedError("Already stored in Qdrant, not needed here.")
+        # Return dummy vectors for each text
+        return [np.zeros(1536).tolist() for _ in texts]
 
     def embed_query(self, text):
-        raise NotImplementedError("Already stored in Qdrant, not needed here.")
+        # Return a dummy vector for query
+        return np.zeros(1536).tolist()
+
 
 def build_or_load_index(pdf_path,rebuild=False):
     """
