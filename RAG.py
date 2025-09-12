@@ -155,11 +155,12 @@ if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 
 # Load or build Qdrant index
-if "vectordb" not in st.session_state:
-    vectordb = build_or_load_index(PDF_PATH, rebuild=False)
-    st.session_state.vectordb = vectordb
+# Load or build Qdrant index
+if "vectordb" not in st.session_state or st.session_state.vectordb is None:
+    st.session_state.vectordb = build_or_load_index(PDF_PATH, rebuild=False)
 
 retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
 # =========================
 # SIDEBAR: PDF VIEWER
 # =========================
