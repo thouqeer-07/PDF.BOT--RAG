@@ -79,7 +79,7 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
-def build_or_load_index(pdf_path, rebuild=False):
+def build_or_load_index(pdf_path):
     """
     Only loads an existing collection from Qdrant.
     Embeddings are already stored locally.
@@ -92,14 +92,14 @@ def build_or_load_index(pdf_path, rebuild=False):
         st.error("QDRANT_URL or QDRANT_API_KEY not set!")
         return None
 
-    qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
     try:
         vectordb = QdrantVectorStore.from_existing_collection(
             collection_name=collection_name,
-            client=qdrant_client,   # pass the Qdrant client
-            embedding=None           # embedding not needed, data already stored
+            location=QDRANT_URL,   # pass URL
+            api_key=QDRANT_API_KEY, # pass API key
+            embedding=None         # embedding not needed, already stored
         )
     except Exception as e:
         import streamlit as st
