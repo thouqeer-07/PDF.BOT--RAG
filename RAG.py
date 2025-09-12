@@ -78,6 +78,15 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 import pathlib
 import os
+from langchain.embeddings.base import Embeddings
+
+class DummyEmbeddings(Embeddings):
+    """Wrapper to satisfy QdrantVectorStore even if embeddings exist in DB."""
+    def embed_documents(self, texts):
+        raise NotImplementedError("Already stored in Qdrant, not needed here.")
+
+    def embed_query(self, text):
+        raise NotImplementedError("Already stored in Qdrant, not needed here.")
 
 def build_or_load_index(pdf_path,rebuild=False):
     """
@@ -99,7 +108,7 @@ def build_or_load_index(pdf_path,rebuild=False):
             collection_name=collection_name,
             location=QDRANT_URL,   # pass URL
             api_key=QDRANT_API_KEY, # pass API key
-            embedding=None         # embedding not needed, already stored
+            embedding=DummyEmbeddings()         # embedding not needed, already stored
         )
     except Exception as e:
         import streamlit as st
