@@ -69,12 +69,13 @@ class OllamaEmbeddings(Embeddings):
 def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
-    # Detect environment
+    # Detect environment → Streamlit Cloud sets this automatically
     running_in_cloud = os.getenv("STREAMLIT_RUNTIME", "false").lower() == "true"
 
     if running_in_cloud:
         # ✅ On Streamlit Cloud → use Gemini embeddings only
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
         return QdrantVectorStore(
             client=qdrant_client,
             collection_name=collection_name,
@@ -82,8 +83,9 @@ def build_or_load_index(pdf_path, rebuild=False):
         )
 
     else:
-        # ✅ On local → use Ollama for embedding + indexing
+        # ✅ On local → use Ollama for embeddings
         embeddings = OllamaEmbeddings()
+
         collections = [c.name for c in qdrant_client.get_collections().collections]
 
         if not rebuild and collection_name in collections:
