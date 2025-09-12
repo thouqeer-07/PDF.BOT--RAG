@@ -85,13 +85,14 @@ import numpy as np
 class DummyEmbeddings(Embeddings):
     """Minimal embedding class to satisfy QdrantVectorStore initialization."""
     
+    def __init__(self, dim=768):  # Use the actual dimension of your collection
+        self.dim = dim
+
     def embed_documents(self, texts):
-        # Return dummy vectors for each text
-        return [np.zeros(1536).tolist() for _ in texts]
+        return [np.zeros(self.dim).tolist() for _ in texts]
 
     def embed_query(self, text):
-        # Return a dummy vector for query
-        return np.zeros(1536).tolist()
+        return np.zeros(self.dim).tolist()
 
 
 def build_or_load_index(pdf_path,rebuild=False):
@@ -114,7 +115,7 @@ def build_or_load_index(pdf_path,rebuild=False):
             collection_name=collection_name,
             location=QDRANT_URL,   # pass URL
             api_key=QDRANT_API_KEY, # pass API key
-            embedding=DummyEmbeddings()         # embedding not needed, already stored
+            embedding=DummyEmbeddings(dim=768)         # embedding not needed, already stored
         )
     except Exception as e:
         import streamlit as st
