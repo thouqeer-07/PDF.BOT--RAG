@@ -106,7 +106,7 @@ def build_or_load_index(pdf_path, rebuild=False):
             )
         else:
             vectordb = QdrantVectorStore.from_existing_collection(
-                client=qdrant_client,
+                qdrant_client=qdrant_client,  
                 collection_name=collection_name,
                 embedding=embeddings,
                 collection_config=None
