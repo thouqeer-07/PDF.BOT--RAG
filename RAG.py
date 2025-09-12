@@ -69,19 +69,20 @@ class OllamaEmbeddings(Embeddings):
 def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
-    # Detect environment: local vs cloud
+    # Detect environment
     running_in_cloud = os.getenv("STREAMLIT_RUNTIME", "false").lower() == "true"
 
     if running_in_cloud:
-        # ✅ On Streamlit Cloud → only connect to existing collection
+        # ✅ On Streamlit Cloud → use Gemini embeddings only
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         return QdrantVectorStore(
             client=qdrant_client,
             collection_name=collection_name,
             embedding=embeddings
         )
+
     else:
-        # ✅ On local → build or reload using Ollama
+        # ✅ On local → use Ollama for embedding + indexing
         embeddings = OllamaEmbeddings()
         collections = [c.name for c in qdrant_client.get_collections().collections]
 
@@ -92,7 +93,7 @@ def build_or_load_index(pdf_path, rebuild=False):
                 embedding=embeddings
             )
 
-        # Build index locally with Ollama
+        # Build new index locally
         pages = load_doc(pdf_path)
         chunks = split_doc(pages)
 
