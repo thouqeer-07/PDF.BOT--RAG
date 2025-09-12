@@ -71,12 +71,9 @@ if is_local():
         def embed_query(self, text):
             return self._get_embedding(text)
 def get_embeddings():
-    if is_local():
-        return OllamaEmbeddings()
-    else:
-        # Streamlit Cloud → always use Gemini
-        from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    # Always use Gemini embeddings in Cloud
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # =========================
 # 3. BUILD OR LOAD INDEX
