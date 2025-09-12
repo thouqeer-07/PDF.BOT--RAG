@@ -40,6 +40,8 @@ def split_doc(pages):
 # 2. EMBEDDINGS (Local vs Cloud)
 # =========================
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain.embeddings.base import Embeddings
+import requests, os, socket
 
 class OllamaEmbeddings(Embeddings):
     """Local embedding generator using Ollama API"""
@@ -49,18 +51,27 @@ class OllamaEmbeddings(Embeddings):
 
     def _get_embedding(self, text):
         r = requests.post(self.url, json={"model": self.model, "input": text})
-        if r.status_code == 200:
-            return r.json()["embeddings"][0]
-        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
+        r.raise_for_status()
+        return r.json()["embeddings"][0]
 
     def embed_documents(self, texts):
         r = requests.post(self.url, json={"model": self.model, "input": texts})
-        if r.status_code == 200:
-            return r.json()["embeddings"]
-        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
+        r.raise_for_status()
+        return r.json()["embeddings"]
 
     def embed_query(self, text):
         return self._get_embedding(text)
+
+
+def get_embeddings():
+    """Auto-detect environment: use Ollama locally, Gemini in cloud"""
+    # Check if Ollama server is reachable
+    try:
+        socket.create_connection(("localhost", 11434), timeout=1)
+        return OllamaEmbeddings()
+    except Exception:
+        # Default to Gemini when Ollama is not available (e.g., Streamlit Cloud)
+        return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 
 # =========================
@@ -78,7 +89,7 @@ def build_or_load_index(pdf_path, rebuild=False):
     )
 
     # ✅ Always use Gemini embeddings in Streamlit Cloud
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = get_embeddings()
 
     collection_name = "1._Self-Help_Author_Samuel_Smiles"
 
