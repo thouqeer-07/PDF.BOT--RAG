@@ -105,6 +105,7 @@ def build_or_load_index(pdf_path):
         client=qdrant_client,
         collection_name=collection_name,
         embedding=embeddings,
+        collection_config=None 
     )
 
     return vectordb
