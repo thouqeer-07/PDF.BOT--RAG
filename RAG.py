@@ -84,25 +84,39 @@ import pathlib
 import os
 
 def build_or_load_index(pdf_path, rebuild=False):
-    qdrant_client = QdrantClient(
-        url=os.getenv("QDRANT_URL"),
-        api_key=os.getenv("QDRANT_API_KEY")
-    )
+    qdrant_url = os.getenv("QDRANT_URL")
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
+    if not qdrant_url or not qdrant_api_key:
+        st.error("QDRANT_URL or QDRANT_API_KEY not set!")
+        return None
+
+    qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
     embeddings = get_embeddings()
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
-    if rebuild:
-        # optional: rebuild collection from PDF chunks here
-        st.warning("Rebuilding collection is not implemented yet!")
-    
-    vectordb = QdrantVectorStore.from_existing_collection(
-        client=qdrant_client,
-        collection_name=collection_name,
-        embedding=embeddings,
-        collection_config=None  # avoids embed_documents() validation
-    )
+    try:
+        if rebuild:
+            # Optional: create new collection from scratch
+            vectordb = QdrantVectorStore.from_documents(
+                documents=split_doc(load_doc(pdf_path)),
+                embedding=embeddings,
+                collection_name=collection_name,
+                client=qdrant_client
+            )
+        else:
+            vectordb = QdrantVectorStore.from_existing_collection(
+                client=qdrant_client,
+                collection_name=collection_name,
+                embedding=embeddings,
+                collection_config=None
+            )
+    except Exception as e:
+        st.error(f"Failed to load or build Qdrant index: {e}")
+        return None
+
     return vectordb
+
 # =========================
 # 4. PROMPT TEMPLATE
 # =========================
