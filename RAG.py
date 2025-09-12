@@ -83,26 +83,26 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
-def build_or_load_index(pdf_path):
+def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(
         url=os.getenv("QDRANT_URL"),
         api_key=os.getenv("QDRANT_API_KEY")
     )
 
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = get_embeddings()
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
-    # Use the class method to load an existing collection without validating embeddings
+    if rebuild:
+        # optional: rebuild collection from PDF chunks here
+        st.warning("Rebuilding collection is not implemented yet!")
+    
     vectordb = QdrantVectorStore.from_existing_collection(
         client=qdrant_client,
         collection_name=collection_name,
-        embedding=embeddings
+        embedding=embeddings,
+        collection_config=None  # avoids embed_documents() validation
     )
-
     return vectordb
-
-
-
 # =========================
 # 4. PROMPT TEMPLATE
 # =========================
