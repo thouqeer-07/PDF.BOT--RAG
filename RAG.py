@@ -83,39 +83,54 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
+from langchain_qdrant import QdrantVectorStore
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import os
+import pathlib
+
 def build_or_load_index(pdf_path, rebuild=False):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
+
     qdrant_url = os.getenv("QDRANT_URL")
     qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
-    if not qdrant_url or not qdrant_api_key:
-        st.error("QDRANT_URL or QDRANT_API_KEY not set!")
-        return None
-
-    qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
-    embeddings = get_embeddings()
-    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
-
     try:
         if rebuild:
+            # Create a new collection from documents
+            from langchain_community.document_loaders import PyPDFLoader
+            from langchain.text_splitter import CharacterTextSplitter
+
+            def load_doc(path):
+                return PyPDFLoader(path).load()
+
+            def split_doc(pages):
+                splitter = CharacterTextSplitter(
+                    separator="\n", chunk_size=500, chunk_overlap=100
+                )
+                return splitter.split_documents(pages)
+
             vectordb = QdrantVectorStore.from_documents(
                 documents=split_doc(load_doc(pdf_path)),
                 embedding=embeddings,
                 collection_name=collection_name,
-                client=qdrant_client
+                location=qdrant_url,
+                api_key=qdrant_api_key,
             )
         else:
+            # Load existing collection
             vectordb = QdrantVectorStore.from_existing_collection(
-                client=qdrant_client,  # <-- use 'client', not 'qdrant_client'
                 collection_name=collection_name,
                 embedding=embeddings,
-                collection_config=None
+                location=qdrant_url,
+                api_key=qdrant_api_key,
             )
     except Exception as e:
+        import streamlit as st
         st.error(f"Failed to load or build Qdrant index: {e}")
         return None
 
     return vectordb
-
 
 # =========================
 # 4. PROMPT TEMPLATE
