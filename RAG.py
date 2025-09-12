@@ -2,103 +2,90 @@ import os
 import pathlib
 import streamlit as st
 import google.generativeai as genai
+import requests
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.prompts import PromptTemplate
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.embeddings.base import Embeddings
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-from qdrant_client.models import PointStruct, VectorParams, Distance
+from langchain.prompts import PromptTemplate
+from langchain.schema import Document
 
 # =========================
-# 0. ENV + GLOBALS
+# 0. ENV
 # =========================
 load_dotenv()
-INDEX_DIR = pathlib.Path("./index")
-INDEX_DIR.mkdir(exist_ok=True)
-
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
 PDF_PATH = "1. Self-Help Author Samuel Smiles.pdf"
 PDF_NAME = pathlib.Path(PDF_PATH).name
-
-genai.configure(api_key=GOOGLE_API_KEY)
+collection_name = pathlib.Path(PDF_PATH).stem.replace(" ", "_")
 
 # =========================
-# 1. DOC LOADING + SPLITTING
+# 1. PDF LOADING + CHUNKING
 # =========================
 def load_doc(path):
     return PyPDFLoader(path).load()
 
 def split_doc(pages):
-    return RecursiveCharacterTextSplitter(
-        chunk_size=500, chunk_overlap=100
-    ).split_documents(pages)
+    splitter = CharacterTextSplitter(
+        separator="\n",       # you can also use "" for strict splitting
+        chunk_size=500,
+        chunk_overlap=100
+    )
+    return splitter.split_documents(pages)
 
 # =========================
-# 2. GEMINI EMBEDDINGS (no LangChain)
+# 2. OLLAMA EMBEDDINGS
 # =========================
-class GeminiEmbeddings:
-    def __init__(self, model="models/embedding-001"):
+class OllamaEmbeddings(Embeddings):
+    def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
         self.model = model
+        self.url = url
+
+    def _get_embedding(self, text):
+        r = requests.post(self.url, json={"model": self.model, "input": text})
+        if r.status_code == 200:
+            return r.json()["embeddings"][0]
+        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
 
     def embed_documents(self, texts):
-        vectors = []
-        for t in texts:
-            resp = genai.embed_content(model=self.model, input=t)
-            vectors.append(resp["embedding"])
-        return vectors
+        r = requests.post(self.url, json={"model": self.model, "input": texts})
+        if r.status_code == 200:
+            return r.json()["embeddings"]
+        raise RuntimeError(f"Ollama API error {r.status_code}: {r.text}")
 
     def embed_query(self, text):
-        resp = genai.embed_content(model=self.model, input=text)
-        return resp["embedding"]
-
-# helper
-def get_embeddings():
-    return GeminiEmbeddings()
+        return self._get_embedding(text)
 
 # =========================
-# 3. BUILD OR LOAD INDEX (QDRANT CLOUD)
+# 3. BUILD OR LOAD INDEX
 # =========================
 def build_or_load_index(pdf_path, rebuild=False):
-    collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
-    qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-    embeddings = get_embeddings()
+    qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    embeddings = OllamaEmbeddings()
 
-    # check if collection exists
-    collections = [c.name for c in qdrant.get_collections().collections]
+    collections = [c.name for c in qdrant_client.get_collections().collections]
     if not rebuild and collection_name in collections:
-        return qdrant, collection_name, embeddings
+        return QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=embeddings)
 
-    # otherwise create new collection
+    # Load PDF, split, embed, and upload
     pages = load_doc(pdf_path)
     chunks = split_doc(pages)
 
-    vectors = embeddings.embed_documents([c.page_content for c in chunks])
-
-    # recreate collection
-    if collection_name in collections:
-        qdrant.delete_collection(collection_name=collection_name)
-
-    qdrant.recreate_collection(
+    vectordb = QdrantVectorStore.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        url=QDRANT_URL,
+        api_key=QDRANT_API_KEY,
         collection_name=collection_name,
-        vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+        batch_size=16
     )
-
-    # upload data
-    qdrant.upload_points(
-        collection_name=collection_name,
-        points=[
-            PointStruct(id=i, vector=vectors[i], payload={"text": chunks[i].page_content})
-            for i in range(len(chunks))
-        ],
-    )
-
-    return qdrant, collection_name, embeddings
+    return vectordb
 
 # =========================
-# 4. PROMPT
+# 4. PROMPT TEMPLATE
 # =========================
 SYSTEM_PROMPT = (
     "You are a precise, concise assistant.\n"
@@ -130,22 +117,33 @@ st.markdown("<h1 style='text-align:center;color:Gold;'>📚 PDF Chatbot Assistan
 st.markdown("<h4 style='text-align:center;color:Brown;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
 
 if "pdf_chats" not in st.session_state:
-    st.session_state.pdf_chats = {}
-if "selected_pdf" not in st.session_state:
-    st.session_state.selected_pdf = None
-if "vectorstore" not in st.session_state:
-    st.session_state.vectorstore = None
+    st.session_state.pdf_chats = []
 if "input_text" not in st.session_state:
     st.session_state.input_text = ""
 
-if not st.session_state.vectorstore:
-    qdrant, collection, embeddings = build_or_load_index(PDF_PATH, rebuild=False)
-    st.session_state.vectorstore = (qdrant, collection, embeddings)
-    st.session_state.pdf_chats[PDF_NAME] = []
+# Load or build Qdrant index
+if "vectordb" not in st.session_state:
+    vectordb = build_or_load_index(PDF_PATH, rebuild=False)
+    st.session_state.vectordb = vectordb
 
-st.session_state.selected_pdf = PDF_NAME
-st.sidebar.success(f"✅ {PDF_NAME} loaded!")
+retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+# =========================
+# SIDEBAR: PDF VIEWER
+# =========================
+with st.sidebar:
+    st.markdown("### 📄 PDF Viewer")
+    if os.path.exists(PDF_PATH):
+        # Show file info
+        st.markdown(f"**File:** {PDF_NAME}")
 
+        # Option 1: Open PDF in new tab
+        with open(PDF_PATH, "rb") as f:
+            st.download_button(
+                label="📥 Download PDF",
+                data=f,
+                file_name=PDF_NAME,
+                mime="application/pdf"
+            )
 # =========================
 # 6. CHAT HANDLER
 # =========================
@@ -154,48 +152,81 @@ def send_message():
     if not user_input:
         return
 
-    qdrant, collection, embeddings = st.session_state.vectorstore
-    query_vector = embeddings.embed_query(user_input)
+    # Basic greetings & thanks
+    greetings = {"hi", "hello", "hey", "hiya", "hii"}
+    farewells = {"bye", "goodbye", "exit", "quit"}
+    thanks = {"thanks", "thank you", "thx"}
 
-    search_result = qdrant.search(
-        collection_name=collection,
-        query_vector=query_vector,
-        limit=4,
-    )
+    if user_input.lower() in greetings:
+        bot_reply = "Hello! 👋 How can I help you today?"
+    elif user_input.lower() in farewells:
+        bot_reply = "Goodbye! 👋 Have a great day!"
+    elif user_input.lower() in thanks:
+        bot_reply = "You're welcome! 😊"
+    else:
+        docs = retriever.invoke(user_input)
+        context = "\n\n".join([d.page_content for d in docs])
 
-    context = "\n\n".join([hit.payload["text"] for hit in search_result])
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    prompt = get_prompt().format(context=context, question=user_input)
-    response = model.generate_content(prompt)
-    bot_reply = response.text.strip()
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = get_prompt().format(context=context, question=user_input)
+        response = model.generate_content(prompt)
+        bot_reply = response.text.strip()
 
-    st.session_state.pdf_chats[st.session_state.selected_pdf].append(
-        {"role": "user", "content": user_input}
-    )
-    st.session_state.pdf_chats[st.session_state.selected_pdf].append(
-        {"role": "assistant", "content": bot_reply}
-    )
+    st.session_state.pdf_chats.append({"user": user_input, "bot": bot_reply})
     st.session_state.input_text = ""
 
 # =========================
-# 7. RENDER CHAT
+# 7. RENDER CHAT (Improved UI with visible colors)
 # =========================
-if st.session_state.selected_pdf:
-    chat = st.session_state.pdf_chats[st.session_state.selected_pdf]
-    for msg in chat:
-        if msg["role"] == "user":
-            st.markdown(
-                f"<div style='display:flex;justify-content:flex-end;margin:5px 0;'>"
-                f"<div style='background-color:lightblue;color:#000;padding:12px;border-radius:12px;max-width:70%;"
-                f"font-size:16px;line-height:1.5;word-wrap:break-word;'>{msg['content']}</div></div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f"<div style='display:flex;justify-content:flex-start;margin:5px 0;'>"
-                f"<div style='background-color:#F1F0F0;color:#000;padding:12px;border-radius:12px;max-width:70%;"
-                f"font-size:16px;line-height:1.5;word-wrap:break-word;'>{msg['content']}</div></div>",
-                unsafe_allow_html=True,
-            )
+st.markdown(
+    """
+    <style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .chat-bubble {
+        padding: 12px 18px;
+        border-radius: 18px;
+        max-width: 70%;
+        word-wrap: break-word;
+        font-size: 16px;
+    }
+    .user-msg {
+        background-color: #4CAF50;  /* Dark green */
+        color: white;
+        align-self: flex-end;       /* Align right */
+        text-align: right;
+        margin-left: 30%;           /* Push further right */
+    }
+    .bot-msg {
+        background-color: #E0E0E0;  /* Light gray */
+        color: black;
+        align-self: flex-start;      /* Align left */
+        text-align: left;
+        margin-right: 30%;           /* Optional: push a bit left */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-    st.text_input("Type your question here...", key="input_text", on_change=send_message)
+# Input box
+st.text_input("Ask a question about the PDF:", key="input_text", on_change=send_message)
+
+# Render chat history
+st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+for chat in st.session_state.pdf_chats:
+    st.markdown(
+        f"<div class='chat-bubble user-msg'>💬 {chat['user']}</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"<div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div>",
+        unsafe_allow_html=True
+    )
+st.markdown("</div>", unsafe_allow_html=True)
+
+
