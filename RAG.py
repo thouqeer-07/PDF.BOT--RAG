@@ -80,6 +80,8 @@ def get_embeddings():
 # =========================
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+import pathlib
+import os
 
 def build_or_load_index(pdf_path, rebuild=False):
     qdrant_client = QdrantClient(
@@ -88,15 +90,15 @@ def build_or_load_index(pdf_path, rebuild=False):
     )
 
     embeddings = get_embeddings()  # safe selection
-
     collection_name = pathlib.Path(pdf_path).stem.replace(" ", "_")
 
+    # If you already have a Qdrant collection, skip validation
     return QdrantVectorStore(
         client=qdrant_client,
         collection_name=collection_name,
-        embedding=embeddings
+        embedding=embeddings,
+        collection_config=None  # <-- avoids calling embed_documents()
     )
-
 
 # =========================
 # 4. PROMPT TEMPLATE
