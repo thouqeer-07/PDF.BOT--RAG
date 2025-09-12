@@ -66,48 +66,27 @@ class OllamaEmbeddings(Embeddings):
 # =========================
 # 3. BUILD OR LOAD INDEX
 # =========================
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+import os
+
 def build_or_load_index(pdf_path, rebuild=False):
-    qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    qdrant_client = QdrantClient(
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY")
+    )
 
-    # Detect environment → Streamlit Cloud sets this automatically
-    running_in_cloud = os.getenv("STREAMLIT_RUNTIME", "false").lower() == "true"
+    # ✅ Always use Gemini embeddings in Streamlit Cloud
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-    if running_in_cloud:
-        # ✅ On Streamlit Cloud → use Gemini embeddings only
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    collection_name = "1._Self-Help_Author_Samuel_Smiles"
 
-        return QdrantVectorStore(
-            client=qdrant_client,
-            collection_name=collection_name,
-            embedding=embeddings
-        )
-
-    else:
-        # ✅ On local → use Ollama for embeddings
-        embeddings = OllamaEmbeddings()
-
-        collections = [c.name for c in qdrant_client.get_collections().collections]
-
-        if not rebuild and collection_name in collections:
-            return QdrantVectorStore(
-                client=qdrant_client,
-                collection_name=collection_name,
-                embedding=embeddings
-            )
-
-        # Build new index locally
-        pages = load_doc(pdf_path)
-        chunks = split_doc(pages)
-
-        vectordb = QdrantVectorStore.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-            url=QDRANT_URL,
-            api_key=QDRANT_API_KEY,
-            collection_name=collection_name,
-            batch_size=16
-        )
-        return vectordb
+    return QdrantVectorStore(
+        client=qdrant_client,
+        collection_name=collection_name,
+        embedding=embeddings
+    )
 
 
 # =========================
