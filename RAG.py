@@ -79,7 +79,7 @@ from qdrant_client import QdrantClient
 import pathlib
 import os
 
-def build_or_load_index(pdf_path):
+def build_or_load_index(pdf_path,rebuild=False):
     """
     Only loads an existing collection from Qdrant.
     Embeddings are already stored locally.
