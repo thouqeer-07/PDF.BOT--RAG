@@ -39,12 +39,12 @@ def split_doc(pages):
 # =========================
 # 2. EMBEDDINGS (Local vs Cloud)
 # =========================
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import os, socket, requests
 from langchain.embeddings.base import Embeddings
-import requests, os, socket
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
+# Only define Ollama if running locally
 class OllamaEmbeddings(Embeddings):
-    """Local embedding generator using Ollama API"""
     def __init__(self, model="nomic-embed-text", url="http://localhost:11434/api/embed"):
         self.model = model
         self.url = url
@@ -64,14 +64,13 @@ class OllamaEmbeddings(Embeddings):
 
 
 def get_embeddings():
-    """Auto-detect environment: use Ollama locally, Gemini in cloud"""
-    # Check if Ollama server is reachable
+    """Use Ollama locally, Gemini on Streamlit Cloud"""
     try:
         socket.create_connection(("localhost", 11434), timeout=1)
         return OllamaEmbeddings()
     except Exception:
-        # Default to Gemini when Ollama is not available (e.g., Streamlit Cloud)
         return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
 
 
 # =========================
