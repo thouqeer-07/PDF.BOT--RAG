@@ -40,8 +40,12 @@ for i, doc in enumerate(docs):
 
 print(f"📑 Prepared {len(docs)} chunks with overlap...")
 
+# Debug: print first 3 chunk texts
+for idx, doc in enumerate(docs[:3]):
+    print(f"[DEBUG] Chunk {idx+1} text preview:\n{doc.page_content[:500]}\n{'-'*40}")
+
 # 4. Initialize embeddings
-embeddings = OllamaEmbeddings(model="")
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
 
 # 5. Connect to Qdrant
 qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
@@ -66,7 +70,7 @@ for i in tqdm(range(0, len(docs), batch_size), desc="🔼 Uploading", unit="batc
         PointStruct(
             id=str(uuid.uuid4()),
             vector=vec,
-            payload=doc.metadata | {"text": doc.page_content}
+            payload=doc.metadata | {"page_content": doc.page_content, "text": doc.page_content}
         )
         for doc, vec in zip(batch, vectors)
     ]

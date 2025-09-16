@@ -1,5 +1,5 @@
 from langchain_qdrant import QdrantVectorStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_ollama import OllamaEmbeddings
 import streamlit as st
 from config import QDRANT_URL, QDRANT_API_KEY, GOOGLE_API_KEY, COLLECTION_NAME
 
@@ -12,11 +12,8 @@ def build_or_load_index():
         st.error("QDRANT_URL or QDRANT_API_KEY not set!")
         return None
     try:
-        embedding_model = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
-            api_key=GOOGLE_API_KEY
-        )
-        print("[DEBUG] Embedding model created")
+        embedding_model = OllamaEmbeddings(model="nomic-embed-text")
+        print("[DEBUG] Ollama Embedding model created")
         vectordb = QdrantVectorStore.from_existing_collection(
             collection_name=COLLECTION_NAME,
             location=QDRANT_URL,
