@@ -1,64 +1,81 @@
 # embeddings.py
 import os
+import uuid
 from dotenv import load_dotenv
+from tqdm import tqdm
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
-from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
-from tqdm import tqdm  # progress bar
+from qdrant_client.models import Distance, VectorParams, PointStruct
 
-# Load env vars
+# 1. Load environment variables
 load_dotenv()
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
-# 1. Load PDF
+# 2. PDF input
 pdf_path = "1. Self-Help Author Samuel Smiles.pdf"
+collection_name = "self_help_samuel_smiles"  # clean collection name
+
+# 3. Load and split PDF
 loader = PyPDFLoader(pdf_path)
 documents = loader.load()
 
-# 2. Split text into chunks with overlap
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=800,
-    chunk_overlap=150,
-    length_function=len,
-    separators=["\n\n", "\n", " ", ""],
+    chunk_overlap=250,  # ensures overlap
+    length_function=len
 )
 docs = text_splitter.split_documents(documents)
 
-# 3. Add metadata
+# Add metadata
 for i, doc in enumerate(docs):
     doc.metadata.update({
         "chunk_id": i,
         "source": pdf_path,
         "page": doc.metadata.get("page", None),
-        "text_preview": doc.page_content[:200]
+        "text_preview": doc.page_content[:200],
     })
 
-# 4. Initialize embeddings (Ollama must be running locally with "nomic-embed-text")
-embeddings = OllamaEmbeddings(model="nomic-embed-text")
+print(f"📑 Prepared {len(docs)} chunks with overlap...")
 
-# 5. Connect to Qdrant Cloud
-qdrant = QdrantClient(
-    url=QDRANT_URL,
-    api_key=QDRANT_API_KEY,
+# 4. Initialize embeddings
+embeddings = OllamaEmbeddings(model="")
+
+# 5. Connect to Qdrant
+qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+
+# 6. Create/recreate collection
+qdrant.recreate_collection(
+    collection_name=collection_name,
+    vectors_config=VectorParams(size=768, distance=Distance.COSINE),
 )
+print(f"📂 Collection '{collection_name}' created in Qdrant.")
 
-# 6. Upload chunks with progress bar
-print(f"📑 Preparing {len(docs)} chunks for upload...")
-
-# Instead of uploading all at once, do batch upload to show progress
-batch_size = 100
-for i in tqdm(range(0, len(docs), batch_size), desc="🔼 Uploading to Qdrant", unit="batch"):
+# 7. Upload in batches
+batch_size = 50
+for i in tqdm(range(0, len(docs), batch_size), desc="🔼 Uploading", unit="batch"):
     batch = docs[i: i + batch_size]
-    QdrantVectorStore.from_documents(
-        batch,
-        embedding=embeddings,
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        collection_name="1. Self-Help Author Samuel Smiles.pdf",
-        force_recreate=(i == 0)  # only recreate collection in first batch
+
+    # Generate embeddings
+    vectors = embeddings.embed_documents([doc.page_content for doc in batch])
+
+    # Create points with UUIDs
+    points = [
+        PointStruct(
+            id=str(uuid.uuid4()),
+            vector=vec,
+            payload=doc.metadata | {"text": doc.page_content}
+        )
+        for doc, vec in zip(batch, vectors)
+    ]
+
+    # Upload to Qdrant
+    qdrant.upsert(
+        collection_name=collection_name,
+        points=points,
+        wait=True
     )
 
-print("✅ Successfully uploaded all chunks to Qdrant!")
+print("✅ All chunks successfully uploaded to Qdrant with overlap!")
