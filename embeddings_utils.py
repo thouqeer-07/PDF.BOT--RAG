@@ -16,7 +16,7 @@ def build_or_load_index():
             model="models/text-embedding-004",
             api_key=GOOGLE_API_KEY
         )
-        print("[DEBUG] Embedding model created")
+        print("[DEBUG] Google Generative AI Embedding model created for queries")
         vectordb = QdrantVectorStore.from_existing_collection(
             collection_name=COLLECTION_NAME,
             location=QDRANT_URL,
