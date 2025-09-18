@@ -37,37 +37,55 @@ def render_chat():
         .chat-container {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
             max-height: 70vh;
             overflow-y: auto;
+            padding: 12px;
+            border-radius: 10px;
+        }
+        .chat-row {
+            display: flex;
+            align-items: flex-start;
         }
         .chat-bubble {
             padding: 12px 18px;
-            border-radius: 18px;
+            border-radius: 16px;
             max-width: 70%;
+            font-size: 15px;
+            line-height: 1.4;
             word-wrap: break-word;
-            font-size: 16px;
+        }
+        /* User message (right side) */
+        .user-row {
+            justify-content: flex-end;
         }
         .user-msg {
             background-color: #4CAF50;
             color: white;
-            align-self: flex-end;
-            text-align: right;
-            margin-left: 30%;
+            text-align: left;
+        }
+        /* Bot message (left side) */
+        .bot-row {
+            justify-content: flex-start;
         }
         .bot-msg {
             background-color: #E0E0E0;
             color: black;
-            align-self: flex-start;
             text-align: left;
-            margin-right: 30%;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
     for chat in st.session_state.pdf_chats:
-        st.markdown(f"<div class='chat-bubble user-msg'>💬 {chat['user']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='chat-row user-row'><div class='chat-bubble user-msg'>💬 {chat['user']}</div></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div></div>",
+            unsafe_allow_html=True,
+        )
     st.markdown("</div>", unsafe_allow_html=True)
