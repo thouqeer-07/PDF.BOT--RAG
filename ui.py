@@ -70,9 +70,9 @@ def render_chat():
             justify-content: flex-start;
         }
         .bot-msg {
-            background-color: #E0E0E0;
-            color: black;
-            align-self: flex-start;
+            background-color: transparent;
+            border: 1px solid  #2196F3;
+            color: white;
             text-align: left;
         }
         </style>
@@ -82,6 +82,12 @@ def render_chat():
 
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
     for chat in st.session_state.pdf_chats:
-        st.markdown(f"<div class='chat-bubble user-msg'>💬 {chat['user']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div class='chat-row user-row'><div class='chat-bubble user-msg'>{chat['user']}</div></div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'> {chat['bot']}</div></div>",
+            unsafe_allow_html=True,
+        )
     st.markdown("</div>", unsafe_allow_html=True)
