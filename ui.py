@@ -4,8 +4,8 @@ from config import PDF_PATH, PDF_NAME
 def setup_ui():
     print("[DEBUG] setup_ui called")
     st.set_page_config(page_title="RAG Chatbot", layout="wide")
-    st.markdown("<h1 style='text-align:center;color:Gold;'>📚 PDF Chatbot Assistant</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align:center;color:Brown;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center;color:white;'>📚 PDF Chatbot Assistant</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align:center;color:white;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
     if "pdf_chats" not in st.session_state:
         st.session_state.pdf_chats = []
     if "input_text" not in st.session_state:
@@ -60,7 +60,8 @@ def render_chat():
             justify-content: flex-end;
         }
         .user-msg {
-            background-color: #4CAF50;
+            background-color: transparent;
+            border: 1px solid #4CAF50;
             color: white;
             text-align: left;
         }
@@ -71,6 +72,7 @@ def render_chat():
         .bot-msg {
             background-color: #E0E0E0;
             color: black;
+            align-self: flex-start;
             text-align: left;
         }
         </style>
@@ -80,12 +82,6 @@ def render_chat():
 
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
     for chat in st.session_state.pdf_chats:
-        st.markdown(
-            f"<div class='chat-row user-row'><div class='chat-bubble user-msg'>💬 {chat['user']}</div></div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div></div>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"<div class='chat-bubble user-msg'>💬 {chat['user']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='chat-bubble bot-msg'>🤖 {chat['bot']}</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
