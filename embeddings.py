@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_ollama import OllamaEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
@@ -13,10 +13,11 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 load_dotenv()
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # 2. PDF input
 pdf_path = "1. Self-Help Author Samuel Smiles.pdf"
-collection_name = "self_help_samuel_smiles"  # clean collection name
+collection_name = "1. Self-Help Author Samuel Smiles.pdf"  # clean collection name
 
 # 3. Load and split PDF
 loader = PyPDFLoader(pdf_path)
@@ -40,8 +41,11 @@ for i, doc in enumerate(docs):
 
 print(f"📑 Prepared {len(docs)} chunks with overlap...")
 
-# 4. Initialize embeddings
-embeddings = OllamaEmbeddings(model="")
+# 4. Initialize embeddings (Google Generative AI)
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/text-embedding-004",
+    api_key=GOOGLE_API_KEY
+)
 
 # 5. Connect to Qdrant
 qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
@@ -66,7 +70,7 @@ for i in tqdm(range(0, len(docs), batch_size), desc="🔼 Uploading", unit="batc
         PointStruct(
             id=str(uuid.uuid4()),
             vector=vec,
-            payload=doc.metadata | {"text": doc.page_content}
+            payload=doc.metadata | {"page_content": doc.page_content, "text": doc.page_content}
         )
         for doc, vec in zip(batch, vectors)
     ]
