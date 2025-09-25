@@ -7,12 +7,14 @@ def send_message():
     retriever = st.session_state.get("retriever", None)
     user_input = st.session_state.input_text.strip()
     print(f"[DEBUG] User input: {user_input}")
+    print(f"[DEBUG] Selected PDF: {st.session_state.get('selected_pdf')}")
+    print(f"[DEBUG] Retriever: {retriever}")
     if not user_input:
         return
 
-    greetings = {"hi", "hello", "hey", "hiya", "hii"}
+    greetings = {"hi", "hello", "hey", "hii"}
     farewells = {"bye", "goodbye", "exit", "quit"}
-    thanks = {"thanks", "thank you", "thx"}
+    thanks = {"thanks", "thank you", "thx", "tnx"}
 
     if any(greet in user_input.lower() for greet in greetings):
         bot_reply = "Hello! 👋 How can I help you today?"
@@ -23,15 +25,23 @@ def send_message():
     else:
         docs = retriever.invoke(user_input) if retriever else []
         print(f"[DEBUG] Retrieved docs: {len(docs)}")
+        for i, d in enumerate(docs):
+            print(f"[DEBUG] Doc {i}: {getattr(d, 'page_content', str(d))[:200]}")
         if not docs:
             bot_reply = "I couldn't find relevant information in the PDF."
         else:
             context = "\n\n".join([d.page_content for d in docs])
+            print(f"[DEBUG] Context sent to LLM: {context[:500]}")
             genai.configure(api_key=GOOGLE_API_KEY)
             model = genai.GenerativeModel("gemini-2.0-flash")
             prompt = get_prompt().format(context=context, question=user_input)
+            print(f"[DEBUG] Prompt sent to LLM: {prompt}")
             response = model.generate_content(prompt)
+            print(f"[DEBUG] LLM response: {response.text.strip()}")
             bot_reply = response.text.strip()
 
-    st.session_state.pdf_chats.append({"user": user_input, "bot": bot_reply})
+    selected_pdf = st.session_state.get("selected_pdf")
+    if selected_pdf not in st.session_state.pdf_chats:
+        st.session_state.pdf_chats[selected_pdf] = []
+    st.session_state.pdf_chats[selected_pdf].append({"user": user_input, "bot": bot_reply})
     st.session_state.input_text = ""
