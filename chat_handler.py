@@ -40,13 +40,8 @@ def send_message():
             print(f"[DEBUG] LLM response: {response.text.strip()}")
             bot_reply = response.text.strip()
 
-<<<<<<< HEAD
-    st.session_state.pdf_chats.append({"user": user_input, "bot": bot_reply})
-    st.session_state.input_text = ""
-=======
     selected_pdf = st.session_state.get("selected_pdf")
     if selected_pdf not in st.session_state.pdf_chats:
         st.session_state.pdf_chats[selected_pdf] = []
     st.session_state.pdf_chats[selected_pdf].append({"user": user_input, "bot": bot_reply})
     st.session_state.input_text = ""
->>>>>>> new-test
