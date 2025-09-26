@@ -29,16 +29,21 @@ def render_sidebar():
         # Add to history if new upload and not already in Qdrant
         from qdrant_client import QdrantClient
         from config import QDRANT_URL, QDRANT_API_KEY
-        if uploaded_pdf:
-            pdf_path = uploaded_pdf.name  # Use only the filename as collection name and for local file
+        # Cache Qdrant collections for the session to avoid repeated API calls
+        if 'existing_collections' not in st.session_state:
             try:
-                qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-                existing_collections = [c.name for c in qdrant.get_collections().collections]
+                client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+                st.session_state['existing_collections'] = [c.name for c in client.get_collections().collections]
+            except Exception as e:
+                st.session_state['existing_collections'] = []
+                st.warning(f"Error fetching collections: {e}")
+        existing_collections = st.session_state['existing_collections']
+        if uploaded_pdf:
+            pdf_path = uploaded_pdf.name
+            try:
                 st.session_state.selected_pdf = uploaded_pdf.name
-                # Always add to history for download button
                 if not any(pdf['name'] == uploaded_pdf.name for pdf in st.session_state.pdf_history):
                     st.session_state.pdf_history.append({"name": uploaded_pdf.name, "path": pdf_path})
-                # Initialize chat history for new PDF
                 if "pdf_chats" not in st.session_state:
                     st.session_state.pdf_chats = {}
                 if uploaded_pdf.name not in st.session_state.pdf_chats:
@@ -49,23 +54,15 @@ def render_sidebar():
                     with open(pdf_path, "wb") as f:
                         f.write(uploaded_pdf.read())
                     st.success(f"Uploaded: {uploaded_pdf.name}")
-                    # Call embedding/indexing immediately after upload for new PDFs
                     from embeddings_utils import build_or_load_index
                     build_or_load_index(uploaded_pdf.name)
-                # Only rerun if not already on this PDF to avoid infinite rerun
                 if st.session_state.get('selected_pdf') != uploaded_pdf.name:
                     st.session_state.selected_pdf = uploaded_pdf.name
                     st.rerun()
             except Exception as e:
                 st.warning(f"Error checking collections: {e}")
-        # Show all available collections in Qdrant as PDF history
-        try:
-            qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-            existing_collections = [c.name for c in qdrant.get_collections().collections]
-            pdf_names = list(existing_collections)
-        except Exception as e:
-            st.warning(f"Error fetching collections: {e}")
-            pdf_names = [pdf['name'] for pdf in st.session_state.pdf_history]
+        # Use cached collections for PDF history
+        pdf_names = list(existing_collections) if existing_collections else [pdf['name'] for pdf in st.session_state.pdf_history]
 
         if pdf_names:
             # Ensure selected_pdf is in pdf_names, else fallback to first
@@ -134,6 +131,10 @@ def render_chat():
         st.session_state.pdf_chats[selected_pdf] = []
     # Display PDF name and download button at the top
     st.markdown(f"### 📄 {selected_pdf}")
+    # Refresh button for chat interface (clears chat history for this PDF)
+    if st.button("🔄 Refresh Chat", key=f"refresh_{selected_pdf}"):
+        st.session_state.pdf_chats[selected_pdf] = []
+        st.rerun()
     pdf_path = next((pdf['path'] for pdf in st.session_state.pdf_history if pdf['name'] == selected_pdf), None)
     if pdf_path:
         with open(pdf_path, "rb") as f:
