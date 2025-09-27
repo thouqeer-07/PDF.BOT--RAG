@@ -4,8 +4,15 @@ from config import PDF_PATH, PDF_NAME
 def setup_ui():
     print("[DEBUG] setup_ui called")
     st.set_page_config(page_title="RAG Chatbot", layout="wide")
-    st.markdown("<h1 style='text-align:center;color:white;'>📚 PDF Chatbot Assistant</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align:center;color:white;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
+    st.markdown(
+    """
+    <h1 style='text-align:left; margin-top:0; margin-bottom:10px;'>
+        PDF Chatbot Assistant
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+
     if "pdf_chats" not in st.session_state:
         st.session_state.pdf_chats = {}
     if "input_text" not in st.session_state:
@@ -77,73 +84,106 @@ def render_sidebar():
 
 def render_chat():
     print("[DEBUG] render_chat called")
+
     st.markdown(
-        """
-        <style>
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            max-height: 70vh;
-            overflow-y: auto;
-            padding: 12px;
-            border-radius: 10px;
-        }
-        .chat-row {
-            display: flex;
-            align-items: flex-start;
-        }
-        .chat-bubble {
-            padding: 12px 18px;
-            border-radius: 16px;
-            max-width: 70%;
-            font-size: 15px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-        /* User message (right side) */
-        .user-row {
-            justify-content: flex-end;
-        }
-        .user-msg {
-            background-color: transparent;
-            border: 1px solid #4CAF50;
-            color: white;
-            text-align: left;
-        }
-        /* Bot message (left side) */
-        .bot-row {
-            justify-content: flex-start;
-        }
-        .bot-msg {
-            background-color: transparent;
-            border: 1px solid  #2196F3;
-            color: white;
-            text-align: left;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    <style>
+    /* Center the whole Streamlit block container */
+    .block-container {
+        max-width: 800px;   /* set width for chat */
+        margin: 0 auto;     /* center horizontally */
+    }
+
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: 12px;
+        border-radius: 10px;
+    }
+
+    .chat-row {
+        display: flex;
+        align-items: flex-start;
+    }
+    .chat-bubble {
+        padding: 12px 18px;
+        border-radius: 16px;
+        max-width: 70%;
+        font-size: 15px;
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+    .user-row {
+        justify-content: flex-end;
+    }
+    .user-msg {
+        background-color: transparent;
+        border: 1px solid #4CAF50;
+        text-align: left;
+    }
+    .bot-row {
+        justify-content: flex-start;
+    }
+    .bot-msg {
+        background-color: transparent;
+        border: 1px solid  #2196F3;
+        text-align: left;
+        margin-left: 32px;   /* 👈 shift the whole bubble to the right */
+        max-width: 80%;      /* optional: keep bubbles neat */
+        border-radius: 10px; /* optional: rounded edges */
+        padding: 8px; 
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
     selected_pdf = st.session_state.get("selected_pdf")
     if selected_pdf not in st.session_state.pdf_chats:
         st.session_state.pdf_chats[selected_pdf] = []
-    # Display PDF name and download button at the top
-    st.markdown(f"### 📄 {selected_pdf}")
-    # Refresh button for chat interface (clears chat history for this PDF)
-    if st.button("🔄 Refresh Chat", key=f"refresh_{selected_pdf}"):
-        st.session_state.pdf_chats[selected_pdf] = []
-        st.rerun()
+
     pdf_path = next((pdf['path'] for pdf in st.session_state.pdf_history if pdf['name'] == selected_pdf), None)
-    if pdf_path:
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                label=f"Download {selected_pdf}",
-                data=f,
-                file_name=selected_pdf,
-                mime="application/pdf",
-            )
+
+    flag_key = f"refresh_{selected_pdf}"
+    if flag_key not in st.session_state:
+        st.session_state[flag_key] = False
+
+    # Wrap chat in a fixed-width, centered div
+    st.markdown("<div class='chat-wrapper'>", unsafe_allow_html=True)
+
+    # PDF header and buttons
+    col1, col2, col3 = st.columns([5, 0.5, 0.5])
+    with col1:
+        st.markdown(
+        f"""
+        <div style="margin-left: 32px;">
+            <h3>📄 {selected_pdf}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    with col2:
+        if st.button("🔄", help="Refresh Chat", key=f"refresh_btn_{selected_pdf}"):
+            st.session_state[flag_key] = True
+    with col3:
+        if pdf_path:
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label="⬇️",
+                    data=f,
+                    file_name=selected_pdf,
+                    mime="application/pdf",
+                    help="Download PDF"
+                )
+
+    if st.session_state[flag_key]:
+        st.session_state.pdf_chats[selected_pdf] = []
+        st.session_state[flag_key] = False
+
+    # Chat history
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
     for chat in st.session_state.pdf_chats[selected_pdf]:
         st.markdown(
@@ -151,7 +191,8 @@ def render_chat():
             unsafe_allow_html=True,
         )
         st.markdown(
-            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'> {chat['bot']}</div></div>",
+            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'>{chat['bot']}</div></div>",
             unsafe_allow_html=True,
         )
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)

@@ -37,13 +37,27 @@ else:
 # 3. Sidebar
 render_sidebar()
 print("[DEBUG] Sidebar rendered")
+# 6. Chat input styling
+st.markdown(
+    """
+    <style>
+    /* Target the floating chat input container */
+    div[data-testid="stChatInput"] {
+        max-width: 600px;   /* set your preferred width */
+        margin: 0 auto;     /* center horizontally */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# 4. Chat input
+# 7. Chat input (always at bottom in Streamlit)
 user_input = st.chat_input("Ask a question about the PDF...")
 if user_input:
     st.session_state.input_text = user_input
-    send_message()  # this appends to pdf_chats
+    send_message()
 
 # 5. Render chat (always runs to show history)
 render_chat()
 print("[DEBUG] Chat rendered")
+
