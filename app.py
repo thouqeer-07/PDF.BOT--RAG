@@ -2,9 +2,11 @@
 import streamlit as st
 from embeddings_utils import build_or_load_index
 from chat_handler import send_message
-from ui import setup_ui, render_sidebar, render_chat
-
+import ui
+from ui import setup_ui, render_sidebar, render_chat, render_main_ui
 print("[DEBUG] Starting app.py")
+from auth import require_login
+require_login()
 
 # 1. UI setup
 setup_ui()
@@ -37,27 +39,7 @@ else:
 # 3. Sidebar
 render_sidebar()
 print("[DEBUG] Sidebar rendered")
-# 6. Chat input styling
-st.markdown(
-    """
-    <style>
-    /* Target the floating chat input container */
-    div[data-testid="stChatInput"] {
-        max-width: 600px;   /* set your preferred width */
-        margin: 0 auto;     /* center horizontally */
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-# 7. Chat input (always at bottom in Streamlit)
-user_input = st.chat_input("Ask a question about the PDF...")
-if user_input:
-    st.session_state.input_text = user_input
-    send_message()
-
-# 5. Render chat (always runs to show history)
+ui.render_main_ui(send_message)
 render_chat()
 print("[DEBUG] Chat rendered")
 
