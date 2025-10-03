@@ -12,9 +12,6 @@ require_login()
 setup_ui()
 print("[DEBUG] UI setup complete")
 
-
-
-
 # 2. Handle PDF selection and build index
 selected_pdf = st.session_state.get("selected_pdf", None)
 if selected_pdf:

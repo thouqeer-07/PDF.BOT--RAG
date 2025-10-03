@@ -44,7 +44,6 @@ def img_to_base64(path):
     return base64.b64encode(data).decode()
 
 bot_icon_base64 = img_to_base64("assets/BOTI.png")
-user_icon_base64 = img_to_base64("assets/USER.png")
 
 def render_main_ui(send_message):
     # Chat input styling
@@ -257,7 +256,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑", key=f"remove_{pdf_name}"):
+                    if st.button("🗑️", key=f"remove_{pdf_name}"):
                         # Remove from collections
                         if pdf_name in st.session_state['user_collections']:
                             st.session_state['user_collections'].remove(pdf_name)
@@ -278,7 +277,7 @@ def render_sidebar():
                         if st.session_state.get("selected_pdf") == pdf_name:
                            st.session_state["selected_pdf"] = None
 
-                        st.success(f"🗑 PDF '{pdf_name}' removed successfully!")
+                        st.success(f"PDF '{pdf_name}' removed successfully!", icon="🗑")
                         st.rerun()
         else:
             st.info("No PDFs uploaded or indexed yet.")
