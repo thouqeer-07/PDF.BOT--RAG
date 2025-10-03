@@ -1,11 +1,9 @@
-import os
 import pathlib
-from dotenv import load_dotenv
+import streamlit as st
 
-load_dotenv()
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+QDRANT_URL = st.secrets.get("QDRANT_URL")
+QDRANT_API_KEY = st.secrets.get("QDRANT_API_KEY")
+GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
 
 PDF_PATH = next(pathlib.Path(".").glob("*.pdf"), None)
 PDF_NAME = pathlib.Path(PDF_PATH).name if PDF_PATH else None
