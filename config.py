@@ -15,10 +15,10 @@ COLLECTION_NAME = st.secrets.get("COLLECTION_NAME", "default_collection")
 PDF_PATH = next(pathlib.Path(".").glob("*.pdf"), None)
 PDF_NAME = pathlib.Path(PDF_PATH).name if PDF_PATH else None
 
-# === Debug prints ===
+"""# === Debug prints ===
 st.write(f"[DEBUG] GDRIVE_SERVICE_ACCOUNT_JSON: {'set' if GDRIVE_SERVICE_ACCOUNT_JSON else 'not set'}")
 st.write(f"[DEBUG] MONGO_URI: {'set' if MONGO_URI else 'not set'}")
 st.write(f"[DEBUG] QDRANT_API_KEY: {'set' if QDRANT_API_KEY else 'not set'}")
 st.write(f"[DEBUG] GOOGLE_API_KEY: {'set' if GOOGLE_API_KEY else 'not set'}")
 st.write(f"[DEBUG] PDF_PATH: {PDF_PATH}")
-st.write(f"[DEBUG] PDF_NAME: {PDF_NAME}")
+st.write(f"[DEBUG] PDF_NAME: {PDF_NAME}")"""
