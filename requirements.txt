@@ -1,3 +1,4 @@
+pymongo
 streamlit>=1.36.0
 python-dotenv>=1.0.1
 google-generativeai>=0.3.0
@@ -9,3 +10,4 @@ langchain-qdrant>=0.1.0
 pypdf>=4.2.0
 sentence-transformers>=2.7.0
 qdrant-client>=1.7.3
+pydrive2
