@@ -1,6 +1,21 @@
+# Virtual environment folders
 .venv/
 venv/
+
+
 .env/
 env/
-__pychache__/
+
+# Python cache files
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Environment and config files
+*.env
+.envrc
+
+# IDE and editor settings (optional but recommended)
+.vscode/
+.idea/
