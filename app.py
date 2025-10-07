@@ -60,11 +60,3 @@ ui.render_main_ui(send_message)
 render_chat()
 print("[DEBUG] Chat rendered")
 
-hide_streamlit_style = """ 
-<style>
-#MainMenu {visibility: hidden}
-footer {visibility: hidden} 
-header {visibility: hidden} 
-</style>
-"""
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
