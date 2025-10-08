@@ -1,7 +1,7 @@
 from langchain_qdrant import QdrantVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import streamlit as st
-from config import QDRANT_URL, QDRANT_API_KEY, GOOGLE_API_KEY, COLLECTION_NAME, PDF_PATH
+from config import QDRANT_URL, QDRANT_API_KEY, GOOGLE_API_KEY, COLLECTION_NAME
 from langchain_community.document_loaders import PyPDFLoader
 
 # embeddings_utils.py
