@@ -1,17 +1,176 @@
+
 import streamlit as st
 from config import PDF_PATH, PDF_NAME
+import time
+import os
+import base64
+from pymongo import MongoClient
+from  config import MONGO_URI
+client = MongoClient(MONGO_URI)
+db = client["pdfbot"]
+chats_col = db["users"]
+
+
+def save_user_chats():
+    """Save the current user's chat history + collections to MongoDB."""
+    if "username" in st.session_state:
+        username = st.session_state["username"]
+        data = {
+            "username": username,
+            "pdf_chats": st.session_state.get("pdf_chats", {}),
+            "user_collections": st.session_state.get("user_collections", [])
+        }
+        chats_col.update_one({"username": username}, {"$set": data}, upsert=True)
+
+
+def load_user_chats():
+    """Load the logged-in user's chats + collections from MongoDB into session state."""
+    if "username" in st.session_state:
+        username = st.session_state["username"]
+        user_data = chats_col.find_one({"username": username})
+        if user_data:
+            st.session_state["pdf_chats"] = user_data.get("pdf_chats", {})
+            st.session_state["user_collections"] = user_data.get("user_collections", [])
+        else:
+            st.session_state["pdf_chats"] = {}
+            st.session_state["user_collections"] = []
+    else:
+        st.session_state["pdf_chats"] = {}
+        st.session_state["user_collections"] = []
+
+
+def img_to_base64(path):
+    with open(path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+bot_icon_base64 = img_to_base64("assets/BOTI.png")
+
+def render_main_ui(send_message):
+    # Chat input styling
+    st.markdown(
+        """
+        <style>
+        div[data-testid='stChatInput'] {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if "chat_started" not in st.session_state:
+        st.session_state.chat_started = False
+
+    selected_pdf = st.session_state.get("selected_pdf")
+    pdf_chats = st.session_state.pdf_chats.get(selected_pdf, [])
+
+    # --- Clear chat button ---
+    if pdf_chats:
+        if st.button("🧹 Clear Chat", key=f"clear_chat_{selected_pdf}"):
+            # Clear in session_state
+            if "pdf_chats" in st.session_state:
+                st.session_state.pdf_chats[selected_pdf] = []
+            # Persist the cleared chat to USER_CHATS
+            save_user_chats()
+            st.success(f"Chat history for '{selected_pdf}' cleared!")
+            st.rerun()
+
+    # --- Show normal chat input if history exists ---
+    if pdf_chats:
+        show_main_chat_input(send_message, selected_pdf)
+        st.session_state.chat_started = True  # mark chat as started
+    else:
+        # --- Before first message ---
+        show_before_message_ui(send_message, selected_pdf)
+
+
+def show_before_message_ui(send_message, selected_pdf):
+    main_container = st.container()
+    with main_container:
+        st.markdown("""
+            <div style='text-align: center; font-size: 20px; padding: 10px 0;'>
+                <b>Hi! How can I assist you with your PDF?</b>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        st.markdown(
+            """
+            <style>
+            div[data-testid='stChatInput'] {
+                max-width: 750px;
+                margin: 0 auto;
+                text-align:left;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        user_input = st.chat_input("Ask a question...", key=f"before_first_chat_{selected_pdf}")
+
+    # Suggestions pills
+    suggestions = [
+        "⬇️ Download PDF",
+        "📘 What is the summary?",
+        "✍️ Who is the author?",
+        "💡 What are the key takeaways?",
+        "❓ What questions does it address?"
+    ]
+    selected_suggestion = st.pills(
+        label="Select a suggestion",
+        options=suggestions,
+        selection_mode="single",
+        label_visibility="collapsed"
+    )
+
+    # Handle input
+    if selected_suggestion:
+        st.session_state.input_text = selected_suggestion
+        st.session_state.chat_started = True
+        send_message()
+        save_user_chats()  # <-- Save after user input
+        st.rerun()
+    elif user_input:
+        st.session_state.input_text = user_input
+        st.session_state.chat_started = True
+        send_message()
+        save_user_chats()  # <-- Save after user input
+        st.rerun()
+
+def show_main_chat_input(send_message, selected_pdf):
+    st.markdown(
+        """
+        <style>
+        div[data-testid='stChatInput'] {
+            max-width: 750px;
+            margin: 0 auto;
+            text-align:left;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    user_input = st.chat_input("Ask a question about the PDF...", key=f"main_chat_input_{selected_pdf}")
+    if user_input:
+        st.session_state.input_text = user_input
+        send_message()
+        save_user_chats()  # <-- Save after user input
 
 def setup_ui():
-    print("[DEBUG] setup_ui called")
-    st.set_page_config(page_title="RAG Chatbot", layout="wide")
-    st.markdown("<h1 style='text-align:center;color:white;'>📚 PDF Chatbot Assistant</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align:center;color:white;'>RAG PIPELINE</h4>", unsafe_allow_html=True)
+    st.set_page_config(
+        page_title="RAG Chatbot",
+        page_icon="assets/MYLOGO.png",  
+        layout="wide"
+    )
+
+    # Load chats for the logged-in user
     if "pdf_chats" not in st.session_state:
-        st.session_state.pdf_chats = {}
+        load_user_chats()
+
     if "input_text" not in st.session_state:
         st.session_state.input_text = ""
-    # Add all local PDFs to pdf_history for download button
-    import os
+
     if "pdf_history" not in st.session_state:
         st.session_state.pdf_history = []
     local_pdfs = [f for f in os.listdir(".") if f.lower().endswith(".pdf")]
@@ -19,74 +178,282 @@ def setup_ui():
         if not any(h["name"] == pdf for h in st.session_state.pdf_history):
             st.session_state.pdf_history.append({"name": pdf, "path": pdf})
 
+# --- The rest of your original render_sidebar, render_chat, typewriter functions remain unchanged ---
+
+
 def render_sidebar():
-    print("[DEBUG] render_sidebar called")
+    import os
+    username = st.session_state.get("username", "anonymous")
+
     with st.sidebar:
-        st.markdown("### 📄 PDF Uploader")
-        uploaded_pdf = st.file_uploader("Upload a PDF", type=["pdf"])
-        if "pdf_history" not in st.session_state:
-            st.session_state.pdf_history = []
-        # Add to history if new upload and not already in Qdrant
-        from qdrant_client import QdrantClient
-        from config import QDRANT_URL, QDRANT_API_KEY
+        st.markdown("### 📄 Upload a PDF")
+        uploaded_pdf = st.file_uploader("Choose a PDF file", type=["pdf"], key="pdf_uploader")
+
         if uploaded_pdf:
-            pdf_path = uploaded_pdf.name  # Use only the filename as collection name and for local file
-            try:
-                qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-                existing_collections = [c.name for c in qdrant.get_collections().collections]
-                st.session_state.selected_pdf = uploaded_pdf.name
-                # Always add to history for download button
-                if not any(pdf['name'] == uploaded_pdf.name for pdf in st.session_state.pdf_history):
-                    st.session_state.pdf_history.append({"name": uploaded_pdf.name, "path": pdf_path})
-                # Initialize chat history for new PDF
-                if "pdf_chats" not in st.session_state:
-                    st.session_state.pdf_chats = {}
-                if uploaded_pdf.name not in st.session_state.pdf_chats:
-                    st.session_state.pdf_chats[uploaded_pdf.name] = []
-                if uploaded_pdf.name in existing_collections:
-                    st.info(f"PDF '{uploaded_pdf.name}' already indexed. Using existing collection.")
+            pdf_name = uploaded_pdf.name
+            # Save to a user-specific path to avoid file collision
+            user_pdf_filename = f"{username}__{pdf_name}"
+            pdf_path = os.path.join(".", user_pdf_filename)
+
+            # Track last uploaded PDF to avoid repeated reruns
+            if st.session_state.get("last_uploaded_pdf") != pdf_name:
+                st.session_state.last_uploaded_pdf = pdf_name
+
+                user_collections = st.session_state.get('user_collections', [])
+                existing_collection = next(
+                    (col for col in user_collections if col.startswith(f"{username}__{pdf_name}")),
+                    None
+                )
+
+                from embeddings_utils import build_or_load_index
+
+                if existing_collection:
+                    # --- Reuse existing (never duplicate for this user) ---
+                    rerun_needed = (
+                        st.session_state.get('selected_pdf') != pdf_name or
+                        st.session_state.get('current_collection') != existing_collection
+                    )
+                    st.session_state.selected_pdf = pdf_name
+                    st.session_state.current_collection = existing_collection
+
+                    if 'pdf_chats' not in st.session_state:
+                        st.session_state['pdf_chats'] = {}
+
+                    if 'pdf_history' not in st.session_state:
+                        st.session_state['pdf_history'] = []
+
+                    # ✅ Load the saved chat from MongoDB and assign it immediately
+                    user_data = chats_col.find_one({"username": username})
+                    saved_chats = user_data.get("pdf_chats", {}).get(pdf_name, []) if user_data else []
+                    st.session_state.pdf_chats[pdf_name] = saved_chats if saved_chats else []
+
+                    # ✅ Make sure PDF history is updated (never duplicate for this user/collection)
+                    if not any(pdf['name'] == pdf_name and pdf.get('collection') == existing_collection for pdf in st.session_state.pdf_history):
+                        st.session_state.pdf_history.append({
+                            "name": pdf_name,
+                            "path": pdf_path,
+                            "collection": existing_collection
+                        })
+
+                    # Never append duplicate to user_collections
+                    if 'user_collections' not in st.session_state:
+                        st.session_state['user_collections'] = []
+                    if existing_collection not in st.session_state['user_collections']:
+                        st.session_state['user_collections'].append(existing_collection)
+
+                    st.session_state.vectordb = build_or_load_index(collection_name=existing_collection)
+                    st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
+                    st.success(f"✅ Reusing existing chat for '{pdf_name}'")
+                    st.markdown(
+                        f"<div style='background-color:#e6ffe6; padding:8px; border-radius:8px; margin-bottom:8px;'>"
+                        f"<b>{pdf_name}</b> — Existing chat loaded successfully ✅</div>",
+                        unsafe_allow_html=True
+                    )
+
+                    # ✅ Persist the selected PDF and chats so UI reloads properly
+                    save_user_chats()
+
+                    # 🔥 Only rerun if selection or state actually changed
+                    if rerun_needed:
+                        st.rerun()
+
                 else:
+                    # --- New PDF for this user, even if file exists locally ---
+                    user_collection_name = f"{username}__{pdf_name}"
+                    # Always write the uploaded file to a user-specific path (overwrite if exists)
                     with open(pdf_path, "wb") as f:
                         f.write(uploaded_pdf.read())
-                    st.success(f"Uploaded: {uploaded_pdf.name}")
-                    # Call embedding/indexing immediately after upload for new PDFs
-                    from embeddings_utils import build_or_load_index
-                    build_or_load_index(uploaded_pdf.name)
-                # Only rerun if not already on this PDF to avoid infinite rerun
-                if st.session_state.get('selected_pdf') != uploaded_pdf.name:
-                    st.session_state.selected_pdf = uploaded_pdf.name
+
+                    # Always build embeddings/index for this user's collection
+                    st.session_state.vectordb = build_or_load_index(collection_name=user_collection_name, pdf_path=pdf_path)
+                    st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
+                    st.session_state.selected_pdf = pdf_name
+                    st.session_state.current_collection = user_collection_name
+
+                    if 'user_collections' not in st.session_state:
+                        st.session_state['user_collections'] = []
+                    st.session_state['user_collections'].append(user_collection_name)
+
+                    if 'pdf_history' not in st.session_state:
+                        st.session_state['pdf_history'] = []
+                    # Only add to pdf_history if not already present for this user
+                    if not any(pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name for pdf in st.session_state.pdf_history):
+                        st.session_state.pdf_history.append({
+                            "name": pdf_name,
+                            "path": pdf_path,
+                            "collection": user_collection_name
+                        })
+
+                    if 'pdf_chats' not in st.session_state:
+                        st.session_state['pdf_chats'] = {}
+                    st.session_state.pdf_chats[pdf_name] = []
+
+                    save_user_chats()
+                    st.success(f"PDF '{pdf_name}' uploaded and indexed!")
+                    # Only rerun if this is a new upload (always true here)
                     st.rerun()
-            except Exception as e:
-                st.warning(f"Error checking collections: {e}")
-        # Show all available collections in Qdrant as PDF history
-        try:
-            qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-            existing_collections = [c.name for c in qdrant.get_collections().collections]
-            pdf_names = list(existing_collections)
-        except Exception as e:
-            st.warning(f"Error fetching collections: {e}")
-            pdf_names = [pdf['name'] for pdf in st.session_state.pdf_history]
+
+        # --- Sidebar PDF list ---
+        pdf_names = [
+            col.split("__", 1)[1]
+            for col in st.session_state.get('user_collections', [])
+            if col.startswith(f"{username}__")
+        ]
 
         if pdf_names:
-            # Ensure selected_pdf is in pdf_names, else fallback to first
-            current_selected = st.session_state.get("selected_pdf")
-            if current_selected not in pdf_names:
-                current_selected = pdf_names[0]
-                st.session_state.selected_pdf = current_selected
-            selected = st.radio("PDF History", pdf_names, index=pdf_names.index(current_selected))
-            st.session_state.selected_pdf = selected
+            st.markdown("### 📚 Your Uploaded PDFs")
+            for pdf_name in pdf_names:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    if st.session_state.get("selected_pdf") == pdf_name:
+                        st.markdown(f"**{pdf_name}** ✅")
+                    else:
+                        if st.button(pdf_name, key=f"select_{pdf_name}"):
+                            user_collection_name = next(
+                                (col for col in st.session_state['user_collections']
+                                 if col.startswith(f"{username}__{pdf_name}")),
+                                None
+                            )
+                            if user_collection_name:
+                                st.session_state.current_collection = user_collection_name
+                                from embeddings_utils import build_or_load_index
+                                st.session_state.vectordb = build_or_load_index(collection_name=user_collection_name)
+                                st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
+                            if 'pdf_chats' not in st.session_state:
+                                st.session_state['pdf_chats'] = {}
+                            if pdf_name not in st.session_state.pdf_chats:
+                                # try to restore from persisted MongoDB if available
+                                user_data = chats_col.find_one({"username": username})
+                                restored_chats = user_data.get("pdf_chats", {}).get(pdf_name, []) if user_data else []
+                                st.session_state.pdf_chats[pdf_name] = restored_chats if restored_chats is not None else []
+
+                            st.session_state.selected_pdf = pdf_name
+                            # Persist selection so reload preserves the correct chat mapping
+                            save_user_chats()
+                            st.rerun()
+
+                with col2:
+                    if st.button("🗑️", key=f"remove_{pdf_name}"):
+                        from qdrant_client import QdrantClient
+                        from config import QDRANT_URL, QDRANT_API_KEY
+
+                        user_collection_name = next(
+                            (col for col in st.session_state['user_collections']
+                             if col.startswith(f"{username}__{pdf_name}")),
+                            None
+                        )
+
+                        # Delete Qdrant collection (fixed API usage)
+                        if user_collection_name:
+                            try:
+                                qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+                                collections = qdrant.get_collections().collections
+                                collection_names = [c.name for c in collections]
+                                if user_collection_name in collection_names:
+                                    qdrant.delete_collection(collection_name=user_collection_name)
+                                    # Wait for deletion to propagate
+                                    import time as _time
+                                    for _ in range(5):
+                                        collections = qdrant.get_collections().collections
+                                        collection_names = [c.name for c in collections]
+                                        if user_collection_name not in collection_names:
+                                            break
+                                        _time.sleep(0.5)
+                                    else:
+                                        print(f"[ERROR] Qdrant collection '{user_collection_name}' still exists after delete attempt.")
+                                else:
+                                    print(f"[INFO] Qdrant collection '{user_collection_name}' does not exist.")
+                            except Exception as e:
+                                print(f"[ERROR] Failed to delete Qdrant collection '{user_collection_name}': {e}")
+
+                        # Delete local PDF
+                        # Always use the user-specific file path
+                        pdf_path = next(
+                            (pdf['path'] for pdf in st.session_state.get('pdf_history', [])
+                             if pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name),
+                            None
+                        )
+                        if pdf_path and os.path.exists(pdf_path):
+                            try:
+                                os.remove(pdf_path)
+                            except Exception as e:
+                                print(f"Failed to delete local PDF: {e}")
+
+                        # Remove from user_collections
+                        if user_collection_name in st.session_state.get('user_collections', []):
+                            st.session_state['user_collections'].remove(user_collection_name)
+
+                        # Remove chat history for this PDF from session
+                        if pdf_name in st.session_state.get('pdf_chats', {}):
+                            del st.session_state['pdf_chats'][pdf_name]
+
+                        # Remove from pdf_history
+                        st.session_state['pdf_history'] = [
+                            pdf for pdf in st.session_state.get('pdf_history', [])
+                            if pdf['name'] != pdf_name
+                        ]
+
+
+                        # Remove from MongoDB for this user
+                        user_data = chats_col.find_one({"username": username})
+                        if user_data:
+                            pdf_chats = user_data.get("pdf_chats", {})
+                            pdf_chats.pop(pdf_name, None)
+                            user_collections = user_data.get("user_collections", [])
+                            user_collections = [col for col in user_collections if col != user_collection_name]
+                            chats_col.update_one(
+                                {"username": username},
+                                {"$set": {"pdf_chats": pdf_chats, "user_collections": user_collections}}
+                            )
+
+                        if st.session_state.get("selected_pdf") == pdf_name:
+                            st.session_state["selected_pdf"] = None
+                        st.success(f"PDF '{pdf_name}' fully deleted!", icon="🗑")
+                        st.rerun()
         else:
             st.info("No PDFs uploaded or indexed yet.")
 
+
+
+def typewriter(text, delay=0.005):
+    """Simulates typing effect with bot icon."""
+    container = st.empty()
+    displayed_text = ""
+    fast_delay = 0.001  # much faster typing
+    for char in text:
+        displayed_text += char
+        container.markdown(
+            f"""
+            <div class='chat-row bot-row'>
+                <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center;'>
+                <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
+                </div>
+                <div class='chat-bubble bot-msg'>{displayed_text}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        time.sleep(fast_delay)
+    return displayed_text
+
+
 def render_chat():
     print("[DEBUG] render_chat called")
+
     st.markdown(
         """
         <style>
+        .block-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
         .chat-container {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 20px;
             max-height: 70vh;
             overflow-y: auto;
             padding: 12px;
@@ -103,26 +470,25 @@ def render_chat():
             font-size: 15px;
             line-height: 1.4;
             word-wrap: break-word;
+            margin-bottom: 8px; 
         }
-        /* User message (right side) */
         .user-row {
             justify-content: flex-end;
         }
         .user-msg {
             background-color: transparent;
-            border: 1px solid #4CAF50;
-            color: white;
+            border: 1px solid #75D677;
             text-align: left;
         }
-        /* Bot message (left side) */
         .bot-row {
             justify-content: flex-start;
         }
         .bot-msg {
             background-color: transparent;
-            border: 1px solid  #2196F3;
-            color: white;
             text-align: left;
+            max-width: 80%;
+            border-radius: 10px;
+            padding: 8px; 
         }
         </style>
         """,
@@ -130,27 +496,101 @@ def render_chat():
     )
 
     selected_pdf = st.session_state.get("selected_pdf")
+    if not selected_pdf:
+        st.warning("⚠️ Please upload or select a PDF to start chatting.")
+        return
     if selected_pdf not in st.session_state.pdf_chats:
         st.session_state.pdf_chats[selected_pdf] = []
-    # Display PDF name and download button at the top
-    st.markdown(f"### 📄 {selected_pdf}")
-    pdf_path = next((pdf['path'] for pdf in st.session_state.pdf_history if pdf['name'] == selected_pdf), None)
-    if pdf_path:
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                label=f"Download {selected_pdf}",
-                data=f,
-                file_name=selected_pdf,
-                mime="application/pdf",
-            )
+
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
-    for chat in st.session_state.pdf_chats[selected_pdf]:
+    chats = st.session_state.pdf_chats[selected_pdf]
+    # Find the user-specific file path for the selected PDF
+    user_collection_name = st.session_state.get('current_collection')
+    pdf_path = None
+    if user_collection_name:
+        pdf_path = next((pdf['path'] for pdf in st.session_state.get('pdf_history', [])
+                         if pdf['name'] == selected_pdf and pdf.get('collection') == user_collection_name), None)
+    for i, chat in enumerate(chats):
+        # User message
         st.markdown(
-            f"<div class='chat-row user-row'><div class='chat-bubble user-msg'>{chat['user']}</div></div>",
+            f"""
+            <div class='chat-row user-row'>
+                <div class='chat-bubble user-msg'>{chat['user']}</div>
+                <div style='width:32px; height:32px; display:flex; align-items:center; justify-content:center;'></div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        st.markdown(
-            f"<div class='chat-row bot-row'><div class='chat-bubble bot-msg'> {chat['bot']}</div></div>",
-            unsafe_allow_html=True,
-        )
-    st.markdown("</div>", unsafe_allow_html=True)
+
+        # Bot response
+        bot_content = chat['bot']
+        download_commands = [
+            "⬇️ download pdf",
+            "download pdf",
+            "get pdf",
+            "Show pdf",
+            "send pdf",
+            "download file",
+            "get file",
+            "send file",
+            "pdf download",
+            "please download pdf",
+            "can i download pdf",
+            "download the pdf",
+        ]
+
+        if chat['user'].strip().lower() in download_commands:
+            # Use the user-specific file path
+            if pdf_path and os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                    b64_pdf = base64.b64encode(pdf_bytes).decode()
+                bot_content = f"Here is your PDF: <a href='data:application/pdf;base64,{b64_pdf}' download='{selected_pdf}' style='text-decoration:none; font-weight:bold;'>⬇️ {selected_pdf}</a>"
+            else:
+                bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> is not available for download."
+
+            st.markdown(
+                f"""
+                <div class='chat-row bot-row'>
+                    <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
+                        <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
+                    </div>
+                    <div class='chat-bubble bot-msg'>{bot_content}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        elif i == len(chats) - 1 and not chat.get("animated", False):
+            # Show 'Bot is thinking...' interface before typewriter effect
+            thinking_container = st.empty()
+            thinking_container.markdown(
+                f"""
+                <div class='chat-row bot-row'>
+                    <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
+                        <img src=\"data:image/png;base64,{bot_icon_base64}\" style=\"width:32px; height:32px;\" />
+                    </div>
+                    <div class='chat-bubble bot-msg'><i>🤖 Bot is thinking...</i></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            time.sleep(0.7)  # Simulate thinking delay
+            thinking_container.empty()
+            final_text = typewriter(bot_content)
+            chat['bot'] = final_text
+            chat['animated'] = True
+        else:
+            st.markdown(
+                f"""
+                <div class='chat-row bot-row'>
+                    <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
+                        <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
+                    </div>
+                    <div class='chat-bubble bot-msg'>{bot_content}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # Remove duplicate/erroneous code and fix indentation

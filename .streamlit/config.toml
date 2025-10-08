@@ -3,4 +3,8 @@ base="dark"
 primaryColor="#4CAF50"
 backgroundColor="#0e1117"
 secondaryBackgroundColor="#1e1e1e"
+<<<<<<< HEAD
 textColor="#FFFFFF"
+=======
+textColor="#FFFFFF"
+>>>>>>> new-test
