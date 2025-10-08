@@ -29,12 +29,15 @@ def delete_user(username):
 
 # === CHATS ===
 def get_user_chats(username):
-    return db.user_chats.find_one({"username": username}) or {"pdf_chats": {}, "user_collections": []}
+    return db.user_chats.find_one({"username": username}) or {"pdf_chats": {}, "user_collections": [], "pdf_history": []}
 
-def save_user_chats(username, pdf_chats, user_collections):
+def save_user_chats(username, pdf_chats, user_collections, pdf_history=None):
+    update_data = {"pdf_chats": pdf_chats, "user_collections": user_collections}
+    if pdf_history is not None:
+        update_data["pdf_history"] = pdf_history
     db.user_chats.update_one(
         {"username": username},
-        {"$set": {"pdf_chats": pdf_chats, "user_collections": user_collections}},
+        {"$set": update_data},
         upsert=True
     )
 

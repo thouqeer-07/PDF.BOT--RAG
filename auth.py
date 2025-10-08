@@ -1,12 +1,13 @@
 
 
 import streamlit as st
-import os
+import os  # Only for non-file ops
 import base64
 from pymongo import MongoClient
 from ui import load_user_chats, save_user_chats
 from qdrant_client import QdrantClient
-from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
+from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI, GDRIVE_SERVICE_ACCOUNT_DICT
+from gdrive_utils import get_drive_service, download_pdf_from_drive
 
 
 # --- MongoDB Setup ---
@@ -139,14 +140,16 @@ def delete_account(username):
         except Exception as e:
             st.warning(f"⚠️ Error deleting Qdrant data: {e}")
 
-        # --- Delete all local PDF files for this user (username__*.pdf) ---
-        for fname in os.listdir('.'):
-            if fname.startswith(f"{username}__") and fname.lower().endswith('.pdf'):
-                if os.path.exists(fname):
-                    try:
-                        os.remove(fname)
-                    except Exception as e:
-                        st.warning(f"⚠️ Could not delete {fname}: {e}")
+        # --- Delete all PDFs from Google Drive for this user ---
+        drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+        pdf_history = user_data.get("pdf_history", [])
+        for pdf in pdf_history:
+            file_id = pdf.get("file_id")
+            if file_id:
+                try:
+                    drive_service.files().delete(fileId=file_id).execute()
+                except Exception as e:
+                    st.warning(f"⚠️ Could not delete PDF from Drive: {e}")
 
         # Remove user chat document
         chats_col.delete_one({"username": username})

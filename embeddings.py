@@ -15,13 +15,22 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# 2. PDF input
-pdf_path = "1. Self-Help Author Samuel Smiles.pdf"
+from gdrive_utils import get_drive_service, download_pdf_from_drive
+from config import GDRIVE_SERVICE_ACCOUNT_DICT
+
+# 2. PDF input (cloud)
+file_id = "1AHXXIZ4gGK0sWjFGHCYRmgzNlYgDEchC"  # Set this to the Google Drive file ID
 collection_name = "1. Self-Help Author Samuel Smiles.pdf"  # clean collection name
 
-# 3. Load and split PDF
-loader = PyPDFLoader(pdf_path)
-documents = loader.load()
+# 3. Load and split PDF from Google Drive
+drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+pdf_bytes = download_pdf_from_drive(drive_service, file_id)
+import tempfile
+with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+    tmp.write(pdf_bytes)
+    tmp.flush()
+    loader = PyPDFLoader(tmp.name)
+    documents = loader.load()
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=800,
@@ -34,7 +43,7 @@ docs = text_splitter.split_documents(documents)
 for i, doc in enumerate(docs):
     doc.metadata.update({
         "chunk_id": i,
-        "source": pdf_path,
+        "source": collection_name,
         "page": doc.metadata.get("page", None),
         "text_preview": doc.page_content[:200],
     })
