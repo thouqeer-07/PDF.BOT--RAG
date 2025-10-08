@@ -30,7 +30,11 @@ def get_drive_service():
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 "client_secrets.json", SCOPES)
-            creds = flow.run_local_server()
+            # Headless authentication: print URL and prompt for code
+            auth_url, _ = flow.authorization_url(prompt='consent')
+            print(f"Please go to this URL and authorize access: {auth_url}")
+            code = input("Enter the authorization code here: ")
+            creds = flow.fetch_token(code=code)
         # Save the credentials for the next run
         with open("token.pickle", "wb") as token:
             pickle.dump(creds, token)
