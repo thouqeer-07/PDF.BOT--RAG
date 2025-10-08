@@ -1,6 +1,5 @@
 
 import streamlit as st
-from config import PDF_PATH, PDF_NAME
 import time
 import base64
 from pymongo import MongoClient
