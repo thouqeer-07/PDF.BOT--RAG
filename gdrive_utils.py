@@ -13,18 +13,24 @@ def get_drive_service(credentials_dict):
 
 def upload_pdf_to_drive(service, file_name, file_bytes, folder_id=None):
     """Upload PDF bytes to Google Drive."""
+
     metadata = {"name": file_name}
     if folder_id:
         metadata["parents"] = [folder_id]
 
     media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype="application/pdf")
-    file = service.files().create(
-        body=metadata,
-        media_body=media,
-        fields="id, webViewLink"
-    ).execute()
-
-    return {"id": file.get("id"), "webViewLink": file.get("webViewLink")}
+    try:
+        file = service.files().create(
+            body=metadata,
+            media_body=media,
+            fields="id, webViewLink"
+        ).execute()
+        return {"id": file.get("id"), "webViewLink": file.get("webViewLink")}
+    except Exception as e:
+        import traceback
+        print("[ERROR] Google Drive upload failed:")
+        print(traceback.format_exc())
+        raise
 
 def download_pdf_from_drive(service, file_id):
     """Download PDF bytes from Google Drive."""
