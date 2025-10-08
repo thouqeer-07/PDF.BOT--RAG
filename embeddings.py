@@ -16,14 +16,12 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 from gdrive_utils import get_drive_service, download_pdf_from_drive
-from config import GDRIVE_SERVICE_ACCOUNT_DICT
 
 # 2. PDF input (cloud)
 file_id = "1AHXXIZ4gGK0sWjFGHCYRmgzNlYgDEchC"  # Set this to the Google Drive file ID
 collection_name = "1. Self-Help Author Samuel Smiles.pdf"  # clean collection name
 
-# 3. Load and split PDF from Google Drive
-drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+drive_service = get_drive_service()
 pdf_bytes = download_pdf_from_drive(drive_service, file_id)
 import tempfile
 with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:

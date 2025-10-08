@@ -6,7 +6,7 @@ import base64
 from pymongo import MongoClient
 from ui import load_user_chats, save_user_chats
 from qdrant_client import QdrantClient
-from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI, GDRIVE_SERVICE_ACCOUNT_DICT
+from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 
 
@@ -141,7 +141,7 @@ def delete_account(username):
             st.warning(f"⚠️ Error deleting Qdrant data: {e}")
 
         # --- Delete all PDFs from Google Drive for this user ---
-        drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+        drive_service = get_drive_service()
         pdf_history = user_data.get("pdf_history", [])
         for pdf in pdf_history:
             file_id = pdf.get("file_id")

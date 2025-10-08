@@ -3,7 +3,7 @@ import streamlit as st
 import time
 import base64
 from pymongo import MongoClient
-from config import MONGO_URI, GDRIVE_SERVICE_ACCOUNT_DICT
+from config import MONGO_URI
 from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_from_drive
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
@@ -179,7 +179,7 @@ def setup_ui():
 
 def render_sidebar():
     username = st.session_state.get("username", "anonymous")
-    drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+    drive_service = get_drive_service()
 
     with st.sidebar:
         st.markdown("### 📄 Upload a PDF")
@@ -435,7 +435,7 @@ def render_chat():
     if user_collection_name:
         file_id = next((pdf['file_id'] for pdf in st.session_state.get('pdf_history', [])
                         if pdf['name'] == selected_pdf and pdf.get('collection') == user_collection_name), None)
-    drive_service = get_drive_service(GDRIVE_SERVICE_ACCOUNT_DICT)
+    drive_service = get_drive_service()
     for i, chat in enumerate(chats):
         # User message
         st.markdown(
