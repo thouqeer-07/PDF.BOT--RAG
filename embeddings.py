@@ -16,8 +16,13 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # 2. PDF input
-pdf_path = "1. Self-Help Author Samuel Smiles.pdf"
-collection_name = "1. Self-Help Author Samuel Smiles.pdf"  # clean collection name
+"""
+PDFs should be loaded from cloud (Google Drive) and not from local disk.
+Refactor this script to accept PDF bytes (from Drive) and save to a temp file only for PyPDFLoader compatibility.
+Remove any hardcoded local file logic.
+"""
+pdf_path = None  # Set by caller, should be a temp file from cloud bytes
+collection_name = None  # Set by caller, should be user__pdfname
 
 # 3. Load and split PDF
 loader = PyPDFLoader(pdf_path)
