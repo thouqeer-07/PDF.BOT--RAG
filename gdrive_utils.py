@@ -1,71 +1,67 @@
 import streamlit as st
-
-# Write client_secrets.json from Streamlit secrets if available
-if hasattr(st, "secrets") and "CLIENT_SECRETS_JSON" in st.secrets:
-    with open("client_secrets.json", "w") as f:
-        f.write(st.secrets["CLIENT_SECRETS_JSON"])
-
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
-import io
-import os
+from google_auth_oauthlib.flow import Flow
 import pickle
+import os
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+import io
 
-# If modifying these SCOPES, delete the file token.pickle.
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 def get_drive_service():
-    """Authenticate user via OAuth and return Drive API service."""
     creds = None
-    # The file token.pickle stores the user's access and refresh tokens.
+
+    # Load saved token if available
     if os.path.exists("token.pickle"):
         with open("token.pickle", "rb") as token:
             creds = pickle.load(token)
-    # If there are no valid credentials, let the user log in.
+
+    # If no valid credentials, start OAuth flow
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            from google.auth.transport.requests import Request
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "client_secrets.json", SCOPES)
-            # Headless authentication: print URL and prompt for code
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            print(f"Please go to this URL and authorize access: {auth_url}")
-            code = input("Enter the authorization code here: ")
-            creds = flow.fetch_token(code=code)
-        # Save the credentials for the next run
-        with open("token.pickle", "wb") as token:
-            pickle.dump(creds, token)
-    return build("drive", "v3", credentials=creds)
+        # ✅ FIX: query_params is a dict, not callable
+        redirect_uri = st.query_params.get("redirect_uri", [None])[0] if hasattr(st, "query_params") else None
 
-def upload_pdf_to_drive(service, file_name, file_bytes, folder_id=None):
-    """Upload PDF bytes to Google Drive using OAuth user credentials."""
-    metadata = {"name": file_name}
-    if folder_id:
-        metadata["parents"] = [folder_id]
-    media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype="application/pdf")
-    try:
-        file = service.files().create(
-            body=metadata,
-            media_body=media,
-            fields="id, webViewLink"
-        ).execute()
-        return {"id": file.get("id"), "webViewLink": file.get("webViewLink")}
-    except Exception as e:
-        import traceback
-        print("[ERROR] Google Drive upload failed:")
-        print(traceback.format_exc())
-        raise
+        flow = Flow.from_client_secrets_file(
+            "client_secrets.json",
+            scopes=SCOPES,
+            redirect_uri=redirect_uri or "http://localhost:8501/"
+        )
 
-def download_pdf_from_drive(service, file_id):
-    """Download PDF bytes from Google Drive using OAuth user credentials."""
-    request = service.files().get_media(fileId=file_id)
-    buf = io.BytesIO()
-    downloader = MediaIoBaseDownload(buf, request)
+        auth_url, _ = flow.authorization_url(prompt="consent")
+        st.markdown(f"[Authorize Google Drive access]({auth_url})")
+
+        # Manual code input after granting access
+        code = st.text_input("Paste the authorization code here:")
+        if code:
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            with open("token.pickle", "wb") as token:
+                pickle.dump(creds, token)
+
+    return creds
+
+
+
+def upload_pdf_to_drive(drive_service, pdf_name, pdf_bytes):
+    """Uploads a PDF from bytes to Google Drive and returns file info."""
+    from googleapiclient.http import MediaIoBaseUpload
+    file_metadata = {"name": pdf_name, "mimeType": "application/pdf"}
+    media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype="application/pdf")
+    file = drive_service.files().create(body=file_metadata, media_body=media, fields="id,webViewLink").execute()
+    return {"id": file.get("id"), "webViewLink": file.get("webViewLink")}
+
+
+def download_pdf_from_drive(file_id, destination_path, drive_service=None):
+    """Downloads a PDF file from Google Drive by file ID."""
+    if drive_service is None:
+        creds = get_drive_service()
+        drive_service = build("drive", "v3", credentials=creds)
+
+    request = drive_service.files().get_media(fileId=file_id)
+    fh = io.FileIO(destination_path, "wb")
+    downloader = MediaIoBaseDownload(fh, request)
     done = False
     while not done:
-        _, done = downloader.next_chunk()
-    buf.seek(0)
-    return buf.read()
+        status, done = downloader.next_chunk()
+    fh.close()
+    return destination_path

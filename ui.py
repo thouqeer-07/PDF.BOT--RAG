@@ -179,7 +179,9 @@ def setup_ui():
 
 def render_sidebar():
     username = st.session_state.get("username", "anonymous")
-    drive_service = get_drive_service()
+    from googleapiclient.discovery import build
+    creds = get_drive_service()
+    drive_service = build("drive", "v3", credentials=creds)
 
     with st.sidebar:
         st.markdown("### 📄 Upload a PDF")
@@ -210,11 +212,31 @@ def render_sidebar():
             # Build embeddings/index for this user's collection using in-memory bytes
             from embeddings_utils import build_or_load_index
             import tempfile
-            with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
-                tmp.write(pdf_bytes)
-                tmp.flush()
-                st.session_state.vectordb = build_or_load_index(collection_name=user_collection_name, pdf_path=tmp.name)
-                st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
+            import os
+            # Only build embeddings if not already present for this collection
+            if (
+                "vectordb" not in st.session_state
+                or st.session_state.vectordb is None
+                or st.session_state.PDF_NAME != user_collection_name
+            ):
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    tmp.write(pdf_bytes)
+                    tmp.flush()
+                    temp_pdf_path = tmp.name
+                try:
+                    vectordb = build_or_load_index(collection_name=user_collection_name, pdf_path=temp_pdf_path)
+                    if vectordb is None:
+                        st.error("Failed to build or load PDF index. Please check your PDF and try again.")
+                        return
+                    st.session_state.vectordb = vectordb
+                    st.session_state.retriever = vectordb.as_retriever(search_kwargs={"k": 4})
+                    st.session_state.PDF_NAME = user_collection_name
+                finally:
+                    try:
+                        os.remove(temp_pdf_path)
+                    except Exception as e:
+                        print(f"[WARNING] Could not delete temp PDF file: {e}")
 
             st.session_state.selected_pdf = pdf_name
             st.session_state.current_collection = user_collection_name
@@ -223,7 +245,7 @@ def render_sidebar():
             st.session_state.pdf_chats[pdf_name] = []
             save_user_chats()
             st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!")
-            st.rerun()
+            # Removed st.rerun() to prevent continuous reloads after upload
 
         # --- Sidebar PDF list ---
         pdf_names = [
@@ -235,17 +257,17 @@ def render_sidebar():
         if pdf_names:
             st.markdown("### 📚 Your Uploaded PDFs")
             for pdf_name in pdf_names:
+                user_collection_name = next(
+                    (col for col in st.session_state['user_collections']
+                     if col.startswith(f"{username}__{pdf_name}")),
+                    None
+                )
                 col1, col2 = st.columns([4, 1])
                 with col1:
                     if st.session_state.get("selected_pdf") == pdf_name:
                         st.markdown(f"**{pdf_name}** ✅")
                     else:
                         if st.button(pdf_name, key=f"select_{pdf_name}"):
-                            user_collection_name = next(
-                                (col for col in st.session_state['user_collections']
-                                 if col.startswith(f"{username}__{pdf_name}")),
-                                None
-                            )
                             if user_collection_name:
                                 st.session_state.current_collection = user_collection_name
                                 from embeddings_utils import build_or_load_index
@@ -266,15 +288,9 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑️", key=f"remove_{pdf_name}"):
+                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
-
-                        user_collection_name = next(
-                            (col for col in st.session_state['user_collections']
-                             if col.startswith(f"{username}__{pdf_name}")),
-                            None
-                        )
 
                         # Delete Qdrant collection
                         if user_collection_name:
