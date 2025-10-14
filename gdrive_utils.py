@@ -16,7 +16,7 @@ def handle_oauth_callback():
 
 load_dotenv()
 
-from config import GOOGLE_CLIENT_SECRET
+from config import GOOGLE_CLIENT_SECRET, REDIRECT_URI
 client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
 
 from config import SCOPES
@@ -47,8 +47,26 @@ def get_drive_service():
 
     # If still not found, run OAuth flow and store
     if not creds_info:
-        flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
-        creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
+        # Detect Streamlit Cloud environment
+        import urllib.parse
+        cloud_url = REDIRECT_URI
+        if cloud_url:
+            # Use cloud URL as redirect_uri
+            redirect_uri = cloud_url + "/"
+            # Detect OAuth code in query params
+            query_params = st.experimental_get_query_params()
+            code = query_params.get("code", [None])[0]
+            if code:
+                flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+            else:
+                auth_url, _ = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri).authorization_url(prompt="consent")
+                st.markdown(f"[Connect to Google Drive]({auth_url})")
+                st.stop()
+        else:
+            flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
+            creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
         creds_info = json.loads(creds.to_json())
         st.session_state["google_creds"] = creds_info
         # Store credentials in MongoDB for this user
