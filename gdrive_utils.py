@@ -47,10 +47,7 @@ def get_drive_service():
 
     # If still not found, run OAuth flow and store
     if not creds_info:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            GOOGLE_CLIENT_SECRET,
-            scopes=SCOPES
-        )
+        flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
         creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
         creds_info = json.loads(creds.to_json())
         st.session_state["google_creds"] = creds_info
