@@ -51,7 +51,7 @@ def get_drive_service():
         from config import REDIRECT_URI
         redirect_uri = REDIRECT_URI
         print(f"[DEBUG] Using redirect_uri: {redirect_uri}")
-        query_params = st.experimental_get_query_params()
+        query_params = st.query_params()
         code = query_params.get("code", [None])[0]
         # If running in cloud (not localhost), use web flow
         if redirect_uri and not redirect_uri.startswith("http://localhost"):
