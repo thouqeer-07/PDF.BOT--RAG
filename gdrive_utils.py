@@ -69,7 +69,7 @@ def get_drive_service():
             creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
         creds_info = json.loads(creds.to_json())
         st.session_state["google_creds"] = creds_info
-        # Store credentials in MongoDB for this user
+        # Store credentials in MongoDB for this user IMMEDIATELY after OAuth
         if username:
             chats_col.update_one({"username": username}, {"$set": {"google_creds": creds_info}}, upsert=True)
         st.toast("Connected to Google Drive!", icon="✅")
