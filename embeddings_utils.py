@@ -77,4 +77,5 @@ def build_or_load_index(collection_name=None, pdf_path=None):
     except Exception as e:
         print(f"[DEBUG] Exception in build_or_load_index: {e}")
         st.error(f"Failed to load Qdrant index: {e}")
-        return None
+        return None 
+    
