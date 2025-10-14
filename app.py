@@ -3,8 +3,8 @@ import streamlit as st
 from embeddings_utils import build_or_load_index
 from chat_handler import send_message
 import ui
-from gdrive_utils import handle_oauth_callback
-handle_oauth_callback()
+import streamlit as st
+
 
 from ui import setup_ui, render_sidebar, render_chat, render_main_ui
 print("[DEBUG] Starting app.py")

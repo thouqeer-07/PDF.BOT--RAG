@@ -8,12 +8,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-
+from config import QDRANT_URL, QDRANT_API_KEY, GOOGLE_API_KEY
 # 1. Load environment variables
-load_dotenv()
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
 
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 

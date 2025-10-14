@@ -4,7 +4,7 @@ import streamlit as st
 import os
 
 # Replace this with your MongoDB Atlas connection string
-MONGO_URI = os.getenv("MONGO_URI")
+from config import MONGO_URI    
 DB_NAME = "rag_chatbot"
 
 client = MongoClient(MONGO_URI)

@@ -9,7 +9,11 @@ from qdrant_client import QdrantClient
 from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 
-
+st.set_page_config(
+        page_title="RAG Chatbot",
+        page_icon="assets/MYLOGO.png",  
+        layout="wide"
+    )
 # --- MongoDB Setup ---
 
 client = MongoClient(MONGO_URI)
@@ -121,43 +125,73 @@ def create_account_interface():
 
 # --- DELETE ACCOUNT FUNCTION ---
 def delete_account(username):
-    # --- Delete from users collection ---
-    delete_user(username)
 
-    # --- Delete from user_chats collection ---
-    user_data = chats_col.find_one({"username": username})
-    if user_data:
+    """Deletes a user's entire account and all associated data."""
+    from gdrive_utils import get_or_create_user_folder, list_user_files, delete_pdf_from_drive
+    from qdrant_client import QdrantClient
+
+    st.info("🧹 Deleting all your data (MongoDB, Qdrant, and Google Drive)...")
+
+    try:
+        # --- Load user data from MongoDB ---
+        db = client["pdfbot"]
+        users_col = db["users"]  # ✅ This is the actual collection used in your app
+        user_data = users_col.find_one({"username": username})
+
+        if not user_data:
+            st.warning("User not found in database.")
+            return
+
         user_collections = user_data.get("user_collections", [])
+        pdf_history = user_data.get("pdf_history", [])
 
-        # --- Delete all related Qdrant collections ---
+        # --- 1️⃣ Delete Qdrant Collections ---
         try:
             qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-            collections = qdrant.get_collections().collections
-            existing_collections = [c.name for c in collections]
-            for col in user_collections:
-                if col in existing_collections:
-                    qdrant.delete_collection(collection_name=col)
-        except Exception as e:
-            st.warning(f"⚠️ Error deleting Qdrant data: {e}")
+            existing = [c.name for c in qdrant.get_collections().collections]
+            for collection in user_collections:
+                if collection in existing:
+                    qdrant.delete_collection(collection_name=collection)
+                    st.info(f"🧾 Deleted Qdrant collection: {collection}")
+        except Exception as qe:
+            st.warning(f"⚠️ Qdrant deletion error: {qe}")
 
-        # --- Delete all PDFs from Google Drive for this user ---
-        drive_service = get_drive_service()
-        pdf_history = user_data.get("pdf_history", [])
-        for pdf in pdf_history:
-            file_id = pdf.get("file_id")
-            if file_id:
+        # --- 2️⃣ Delete all PDFs from Google Drive ---
+        try:
+            drive_service = get_drive_service()
+            folder_id = get_or_create_user_folder(drive_service, username)
+            user_files = list_user_files(drive_service, username)
+            for f in user_files:
                 try:
-                    drive_service.files().delete(fileId=file_id).execute()
-                except Exception as e:
-                    st.warning(f"⚠️ Could not delete PDF from Drive: {e}")
+                    delete_pdf_from_drive(drive_service, f['id'], username=username)
+                    st.info(f"🗑 Deleted PDF: {f['name']}")
+                except Exception as de:
+                    st.warning(f"⚠️ Failed to delete Drive file {f['name']}: {de}")
 
-        # Remove user chat document
-        chats_col.delete_one({"username": username})
+            # Delete the folder itself
+            try:
+                drive_service.files().delete(fileId=folder_id).execute()
+                st.info(f"🗂 Deleted Drive folder for user: {username}")
+            except Exception as fe:
+                st.warning(f"⚠️ Could not delete Drive folder: {fe}")
+        except Exception as e:
+            st.warning(f"⚠️ Drive deletion error: {e}")
 
-    # --- Clear session ---
-    st.session_state.clear()
-    st.success("🗑 Your account and all data have been permanently deleted.")
-    st.rerun()
+        # --- 3️⃣ Delete from MongoDB ---
+        try:
+            delete_user(username)
+            chats_col.delete_one({"username": username})
+            st.info("✅ Removed user and chat data from MongoDB.")
+        except Exception as me:
+            st.warning(f"⚠️ MongoDB deletion error: {me}")
+
+        # --- 4️⃣ Clear session and confirm ---
+        st.session_state.clear()
+        st.success("🗑 Account and all related data permanently deleted.")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"❌ Unexpected error while deleting account: {e}")
 
 
 # --- REQUIRE LOGIN + SIDEBAR SETTINGS ---
@@ -211,6 +245,7 @@ def require_login():
                         label_visibility="collapsed"
                     )
                     if action == "✅ Yes, delete permanently":
+                     with st.spinner("🧹 Deleting your account and all data... please wait"):
                         delete_account(username)
                     elif action == "❌ Cancel":
                         st.session_state["confirm_delete"] = False
