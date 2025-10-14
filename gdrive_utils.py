@@ -47,24 +47,23 @@ def get_drive_service():
 
     # If still not found, run OAuth flow and store
     if not creds_info:
-        # Detect Streamlit Cloud environment
         import urllib.parse
-        cloud_url = REDIRECT_URI
-        if cloud_url:
-            # Use cloud URL as redirect_uri
-            redirect_uri = cloud_url + "/"
-            # Detect OAuth code in query params
-            query_params = st.experimental_get_query_params()
-            code = query_params.get("code", [None])[0]
+        from config import REDIRECT_URI
+        redirect_uri = REDIRECT_URI
+        query_params = st.experimental_get_query_params()
+        code = query_params.get("code", [None])[0]
+        # If running in cloud (not localhost), use web flow
+        if redirect_uri and not redirect_uri.startswith("http://localhost"):
+            flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
             if code:
-                flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
                 flow.fetch_token(code=code)
                 creds = flow.credentials
             else:
-                auth_url, _ = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri).authorization_url(prompt="consent")
+                auth_url, _ = flow.authorization_url(prompt="consent")
                 st.markdown(f"[Connect to Google Drive]({auth_url})")
                 st.stop()
         else:
+            # Local development
             flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
             creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
         creds_info = json.loads(creds.to_json())
