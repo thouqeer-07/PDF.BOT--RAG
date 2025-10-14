@@ -11,6 +11,7 @@ google-auth-oauthlib
 google-auth-httplib2
 google-generativeai
 PyPDF2
+PyPDF
 python-dotenv
 tqdm
 
