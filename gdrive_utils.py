@@ -17,9 +17,10 @@ def handle_oauth_callback():
 load_dotenv()
 
 from config import GOOGLE_CLIENT_SECRET
+client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
 
 from config import SCOPES
-flow = Flow.from_client_secrets_file(GOOGLE_CLIENT_SECRET, scopes=SCOPES)
+flow = Flow.from_client_config(client_config, scopes=SCOPES)
 
 
 # Temporary port for OAuth, must be different from Streamlit's (8501)
