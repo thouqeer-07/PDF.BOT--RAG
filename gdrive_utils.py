@@ -18,7 +18,7 @@ load_dotenv()
 
 from config import GOOGLE_CLIENT_SECRET
 
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]  
+from config import SCOPES
 flow = Flow.from_client_secrets_file(GOOGLE_CLIENT_SECRET, scopes=SCOPES)
 
 
