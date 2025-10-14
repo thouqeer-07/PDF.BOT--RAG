@@ -15,7 +15,8 @@ from config import QDRANT_URL, QDRANT_API_KEY, GOOGLE_API_KEY
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 
 # 2. PDF input (cloud)
-file_id = "1AHXXIZ4gGK0sWjFGHCYRmgzNlYgDEchC"  # Set this to the Google Drive file ID
+from config import File
+file_id = File  # Google Drive file ID
 collection_name = "1. Self-Help Author Samuel Smiles.pdf"  # clean collection name
 
 drive_service = get_drive_service()
