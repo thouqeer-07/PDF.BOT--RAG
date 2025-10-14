@@ -23,8 +23,7 @@ flow = Flow.from_client_secrets_file(GOOGLE_CLIENT_SECRET, scopes=SCOPES)
 
 
 # Temporary port for OAuth, must be different from Streamlit's (8501)
-OAUTH_PORT = 8502
-
+from config import OAUTH_PORT
 def get_drive_service():
     """Handles Google OAuth and returns authorized Drive service."""
     # Import MongoDB client

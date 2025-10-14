@@ -16,5 +16,6 @@ GOOGLE_CLIENT_SECRET = st.secrets("GOOGLE_CLIENT_SECRET_FILE")
 REDIRECT_URI = st.secrets("REDIRECT_URI")
 SCOPES = st.secrets("SCOPES")
 File=st.secrets("file_id")
+OAUTH_PORT = st.secrets("OAUTH_PORT")
 # === Google OAuth credentials (for personal Drive) ===
 #CLIENT_SECRETS_JSON = os.getenv("CLIENT_SECRETS_JSON")  # path to client_secrets.json
