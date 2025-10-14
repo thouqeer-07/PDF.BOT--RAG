@@ -382,7 +382,7 @@ def render_sidebar():
 
                         if st.session_state.get("selected_pdf") == pdf_name:
                             st.session_state["selected_pdf"] = None
-                        st.success(f"PDF '{pdf_name}' fully deleted!", icon="🗑")
+                        st.success("🗑 PDF deleted!")
                         st.rerun()
         else:
             st.info("No PDFs uploaded or indexed yet.")
