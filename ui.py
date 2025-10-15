@@ -236,12 +236,17 @@ def render_sidebar():
         st.markdown("### 📄 Upload a PDF")
         if not creds_ok:
             st.warning("Google Drive not connected. Please connect to upload/download files.")
-            # Show Connect to Drive button
-            from gdrive_utils import handle_oauth_callback
-            if st.button("Connect to Google Drive", key="connect_drive_btn"):
-                # This will trigger OAuth flow
-                handle_oauth_callback()
-                st.rerun()
+            # Show only the Connect to Google Drive link
+            from gdrive_utils import get_drive_service
+            # Get the OAuth link from get_drive_service (without triggering rerun)
+            from config import REDIRECT_URI, SCOPES
+            import streamlit as st
+            import json
+            from google_auth_oauthlib.flow import Flow
+            client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
+            flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
+            auth_url, _ = flow.authorization_url(prompt="consent", state=username)
+            st.markdown(f"### 🔗 [Connect to Google Drive]({auth_url})")
         else:
             uploaded_pdf = st.file_uploader("Choose a PDF file", type=["pdf"], key="pdf_uploader")
             upload_clicked = st.button("Upload", key="upload_pdf_button")
