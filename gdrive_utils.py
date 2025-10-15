@@ -106,7 +106,7 @@ def get_drive_service():
         if not code:
             # No code found — show Connect button
             print(f"[DEBUG] No OAuth code found for {username}.")
-            auth_url, _ = flow.authorization_url(prompt="consent")
+            auth_url, _ = flow.authorization_url(prompt="consent", state=username)
             st.markdown(f"### 🔗 [Connect to Google Drive]({auth_url})")
             st.stop()
 
