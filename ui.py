@@ -173,6 +173,9 @@ def show_main_chat_input(send_message, selected_pdf):
     )
     user_input = st.chat_input("Ask a question about the PDF...", key=f"main_chat_input_{selected_pdf}")
     if user_input:
+        if not selected_pdf:
+            st.error("Please select or upload a PDF before sending a message.")
+            return
         st.session_state.input_text = user_input
         send_message()
         save_user_chats()  # <-- Save after user input
