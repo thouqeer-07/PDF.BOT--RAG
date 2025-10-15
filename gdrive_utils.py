@@ -40,6 +40,12 @@ def get_drive_service():
     chats_col = db["users"]
 
     username = st.session_state.get("username") or st.session_state.get("persist_username")
+    if not state and code:
+     user_row = chats_col.find_one({"google_oauth_code": code})
+    if user_row:
+        st.session_state["username"] = user_row["username"]
+        st.session_state["persist_username"] = user_row["username"]
+
     if not username:
         st.error("Please log in before connecting to Google Drive.")
         st.stop()
