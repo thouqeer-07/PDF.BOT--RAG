@@ -13,6 +13,7 @@ if "code" in st.query_params:
     service = get_drive_service()
     st.success("✅ Google Drive connected successfully!")
     st.success("Go Back to the main app to continue.")
+    st.stop()
     st.rerun()
 
 

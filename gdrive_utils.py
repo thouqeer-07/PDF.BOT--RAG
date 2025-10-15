@@ -119,6 +119,7 @@ def get_drive_service():
             auth_url, _ = flow.authorization_url(prompt="consent", state=username)
             st.markdown(f"### 🔗 [Connect to Google Drive]({auth_url})")
             st.stop()
+            
 
         # --- Exchange code for token ---
         try:
