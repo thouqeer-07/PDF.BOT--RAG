@@ -259,7 +259,7 @@ def render_sidebar():
                     # Reuse existing chat interface and collection
                     st.session_state.selected_pdf = pdf_name
                     st.session_state.current_collection = user_collection_name
-                    st.success(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.")
+                    st.toast(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
                     st.rerun()
                 else:
                     # Store file_id in pdf_history and user_collections
@@ -310,7 +310,7 @@ def render_sidebar():
                         st.session_state['pdf_chats'] = {}
                     st.session_state.pdf_chats[pdf_name] = []
                     save_user_chats()
-                    st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!")
+                    st.toast(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
                 if 'pdf_history' not in st.session_state:
                     st.session_state['pdf_history'] = []
                 st.session_state['pdf_history'].append({
@@ -358,7 +358,7 @@ def render_sidebar():
                     st.session_state['pdf_chats'] = {}
                 st.session_state.pdf_chats[pdf_name] = []
                 save_user_chats()
-                st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!")
+                st.toast(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
 
         # --- Sidebar PDF list ---
         pdf_names = [
