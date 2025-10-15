@@ -95,12 +95,23 @@ def get_drive_service():
         creds = flow.credentials
         # Save immediately to session and MongoDB
         creds_info = json.loads(creds.to_json())
+        # Extract all relevant OAuth info
+        oauth_data = {
+            "access_token": creds_info.get("token"),
+            "refresh_token": creds_info.get("refresh_token"),
+            "token_uri": creds_info.get("token_uri"),
+            "client_id": creds_info.get("client_id"),
+            "client_secret": creds_info.get("client_secret"),
+            "scopes": creds_info.get("scopes"),
+            "raw": creds_info
+        }
         st.session_state["google_creds"] = creds_info
-        print(f"[DEBUG] Saving new creds to MongoDB for user {username}")
+        st.session_state["google_oauth_data"] = oauth_data
+        print(f"[DEBUG] Saving new creds and oauth_data to MongoDB for user {username}")
         if username:
             chats_col.update_one(
                 {"username": username},
-                {"$set": {"google_creds": creds_info}},
+                {"$set": {"google_creds": creds_info, "google_oauth_data": oauth_data}},
                 upsert=True
             )
         print(f"[DEBUG] OAuth success, rerunning app.")
@@ -113,12 +124,23 @@ def get_drive_service():
         creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
         # Save immediately after OAuth
         creds_info = json.loads(creds.to_json())
+        # Extract all relevant OAuth info
+        oauth_data = {
+            "access_token": creds_info.get("token"),
+            "refresh_token": creds_info.get("refresh_token"),
+            "token_uri": creds_info.get("token_uri"),
+            "client_id": creds_info.get("client_id"),
+            "client_secret": creds_info.get("client_secret"),
+            "scopes": creds_info.get("scopes"),
+            "raw": creds_info
+        }
         st.session_state["google_creds"] = creds_info
-        print(f"[DEBUG] Saving new creds to MongoDB for user {username}")
+        st.session_state["google_oauth_data"] = oauth_data
+        print(f"[DEBUG] Saving new creds and oauth_data to MongoDB for user {username}")
         if username:
             chats_col.update_one(
                 {"username": username},
-                {"$set": {"google_creds": creds_info}},
+                {"$set": {"google_creds": creds_info, "google_oauth_data": oauth_data}},
                 upsert=True
             )
         print(f"[DEBUG] Local OAuth success, clearing session and stopping.")
