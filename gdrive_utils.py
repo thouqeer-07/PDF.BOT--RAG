@@ -8,7 +8,7 @@ import io
 import json
 import os
 from google_auth_oauthlib.flow import Flow
-from pymongo import MongoClient
+
 from dotenv import load_dotenv
 def handle_oauth_callback():
     """Backward-compatible stub — now handled directly in get_drive_service()."""
@@ -25,58 +25,137 @@ flow = Flow.from_client_config(client_config, scopes=SCOPES)
 
 # Temporary port for OAuth, must be different from Streamlit's (8501)
 from config import OAUTH_PORT
-
 def get_drive_service():
-    """Handles Google OAuth, persists code + creds in MongoDB, returns Drive service."""
-    from config import MONGO_URI, SCOPES, REDIRECT_URI
+    """Handles Google OAuth (Streamlit + MongoDB compatible) and returns authorized Drive service."""
+    from pymongo import MongoClient
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import Flow, InstalledAppFlow
+    from googleapiclient.discovery import build
+    import json, urllib.parse, os
+
+    from config import MONGO_URI, SCOPES, REDIRECT_URI, OAUTH_PORT
     client = MongoClient(MONGO_URI)
     db = client["pdfbot"]
-    users_col = db["users"]
+    chats_col = db["users"]
 
     username = st.session_state.get("username")
-    user_data = users_col.find_one({"username": username}) if username else None
-
-    creds_info = None
-
-    # 1️⃣ Check existing stored credentials
-    if user_data and user_data.get("google_creds"):
-        creds_info = user_data["google_creds"]
-
-    # 2️⃣ If credentials exist, use them directly
-    if creds_info:
-        creds = Credentials.from_authorized_user_info(creds_info)
-        if creds and creds.valid:
-            return build("drive", "v3", credentials=creds)
-
-    # 3️⃣ Otherwise handle OAuth redirect
-    redirect_uri = REDIRECT_URI
-    query_params = st.query_params
-    code = query_params.get("code")
-
-    # Persist code in MongoDB so we can recover it after rerun
-    if code and username:
-        users_col.update_one(
-            {"username": username},
-            {"$set": {"google_oauth_code": code}},
-            upsert=True
-        )
-    elif not code and user_data and user_data.get("google_oauth_code"):
-        code = user_data["google_oauth_code"]
-
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-
-    if not code:
-        # Start OAuth process
-        auth_url, _ = flow.authorization_url(prompt="consent")
-        st.markdown(f"[Connect to Google Drive]({auth_url})")
+    if not username:
+        st.error("Please log in before connecting to Google Drive.")
         st.stop()
 
-    # 4️⃣ Fetch token from code
-    try:
-        flow.fetch_token(code=code)
-        creds = flow.credentials
-        creds_info = json.loads(creds.to_json())
+    # --- Load client config from secrets ---
+    client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
 
+    # --- Try to load creds from session or MongoDB ---
+    creds_info = st.session_state.get("google_creds")
+    if not creds_info:
+        user_data = chats_col.find_one({"username": username})
+        creds_info = user_data.get("google_creds") if user_data else None
+
+    # --- If credentials exist and valid, return Drive service immediately ---
+    if creds_info:
+        try:
+            creds = Credentials.from_authorized_user_info(creds_info)
+            if creds and creds.valid:
+                st.session_state["google_creds"] = creds_info
+                st.session_state["drive_connected"] = True
+                print(f"[DEBUG] Returning cached Drive service for {username}")
+                return build("drive", "v3", credentials=creds)
+
+            # Try refresh if expired
+            if creds.expired and creds.refresh_token:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                refreshed = json.loads(creds.to_json())
+                st.session_state["google_creds"] = refreshed
+                chats_col.update_one(
+                    {"username": username},
+                    {"$set": {"google_creds": refreshed}},
+                    upsert=True
+                )
+                print(f"[DEBUG] Token refreshed for {username}")
+                return build("drive", "v3", credentials=creds)
+        except Exception as e:
+            print(f"[DEBUG] Invalid creds for {username}: {e}")
+            st.warning("Stored Google credentials invalid or expired. Please reconnect.")
+
+    # --- Handle OAuth (Cloud mode) ---
+    if REDIRECT_URI and not REDIRECT_URI.startswith("http://localhost"):
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
+
+        # --- Check for OAuth code in query params ---
+        query_params = st.query_params
+        code = query_params.get("code")
+
+        # --- Save OAuth code instantly to Mongo if present ---
+        if code:
+            chats_col.update_one(
+                {"username": username},
+                {"$set": {"google_oauth_code": code}},
+                upsert=True
+            )
+            st.session_state["google_oauth_code"] = code
+            # Remove ?code=... from URL to avoid rerun loop
+            st.experimental_set_query_params()
+            st.rerun()
+
+        # --- Reuse code from Mongo or session if exists ---
+        code = st.session_state.get("google_oauth_code") or \
+               (chats_col.find_one({"username": username}) or {}).get("google_oauth_code")
+
+        if not code:
+            # No code found — show Connect button
+            print(f"[DEBUG] No OAuth code found for {username}.")
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            st.markdown(f"### 🔗 [Connect to Google Drive]({auth_url})")
+            st.stop()
+
+        # --- Exchange code for token ---
+        try:
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            creds_info = json.loads(creds.to_json())
+            oauth_data = {
+                "access_token": creds_info.get("token"),
+                "refresh_token": creds_info.get("refresh_token"),
+                "token_uri": creds_info.get("token_uri"),
+                "client_id": creds_info.get("client_id"),
+                "client_secret": creds_info.get("client_secret"),
+                "scopes": creds_info.get("scopes"),
+                "raw": creds_info
+            }
+
+            # Save creds and clear old code
+            chats_col.update_one(
+                {"username": username},
+                {"$set": {
+                    "google_creds": creds_info,
+                    "google_oauth_data": oauth_data
+                }, "$unset": {"google_oauth_code": ""}},
+                upsert=True
+            )
+
+            # Update Streamlit session
+            st.session_state["google_creds"] = creds_info
+            st.session_state["google_oauth_data"] = oauth_data
+            st.session_state["drive_connected"] = True
+
+            st.toast("✅ Google Drive connected successfully!")
+            print(f"[DEBUG] OAuth success for {username}")
+            return build("drive", "v3", credentials=creds)
+
+        except Exception as e:
+            print(f"[DEBUG] OAuth error for {username}: {e}")
+            st.error(f"Google OAuth failed: {e}")
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            st.markdown(f"[Retry Google Connection]({auth_url})")
+            st.stop()
+
+    # --- Handle local development OAuth ---
+    else:
+        flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
+        creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
+        creds_info = json.loads(creds.to_json())
         oauth_data = {
             "access_token": creds_info.get("token"),
             "refresh_token": creds_info.get("refresh_token"),
@@ -87,30 +166,19 @@ def get_drive_service():
             "raw": creds_info
         }
 
-        # 5️⃣ Save all OAuth info in MongoDB
-        users_col.update_one(
+        st.session_state["google_creds"] = creds_info
+        st.session_state["google_oauth_data"] = oauth_data
+
+        chats_col.update_one(
             {"username": username},
-            {"$set": {
-                "google_creds": creds_info,
-                "google_oauth_data": oauth_data,
-                "google_oauth_code": code
-            }},
+            {"$set": {"google_creds": creds_info, "google_oauth_data": oauth_data}},
             upsert=True
         )
 
-        # 6️⃣ Save to Streamlit session
-        st.session_state["google_creds"] = creds_info
-        st.session_state["google_oauth_data"] = oauth_data
-        st.session_state["drive_connected"] = True
-
-        st.toast("Connected to Google Drive!", icon="✅")
+        st.toast("✅ Google Drive connected locally!")
+        print(f"[DEBUG] Local OAuth success for {username}")
         return build("drive", "v3", credentials=creds)
 
-    except Exception as e:
-        st.error(f"Google OAuth failed: {e}")
-        auth_url, _ = flow.authorization_url(prompt="consent")
-        st.markdown(f"[Retry Google Connection]({auth_url})")
-        st.stop()
 
 
     # ...existing code...
