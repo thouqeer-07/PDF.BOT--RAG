@@ -150,10 +150,12 @@ def get_drive_service():
             st.session_state["google_oauth_data"] = oauth_data
             st.session_state["drive_connected"] = True
 
-            st.toast("✅ Google Drive connected successfully!")
+            st.success("✅ Google Drive connected successfully!")
+            st.success("Go Back to the main app to continue.")
             print(f"[DEBUG] OAuth success for {username}")
-            st.rerun()
+            
             return build("drive", "v3", credentials=creds)
+            st.rerun()
 
         except Exception as e:
             print(f"[DEBUG] OAuth error for {username}: {e}")
@@ -186,7 +188,8 @@ def get_drive_service():
             upsert=True
         )
 
-        st.toast("✅ Google Drive connected locally!")
+        st.success("✅ Google Drive connected locally!")
+        st.success("Go Back to the main app to continue.")
         print(f"[DEBUG] Local OAuth success for {username}")
         st.rerun()
         return build("drive", "v3", credentials=creds)
