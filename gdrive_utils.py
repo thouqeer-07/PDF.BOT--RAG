@@ -37,22 +37,20 @@ def get_drive_service():
     username = st.session_state.get("username")
     creds_info = None
 
-    # Try to load credentials and code from session state first
+    # Try to load credentials from session state first
     if "google_creds" in st.session_state:
         creds_info = st.session_state["google_creds"]
-        oauth_code = st.session_state.get("google_oauth_code")
     # If not in session, try to load from MongoDB
     elif username:
         user_data = chats_col.find_one({"username": username})
         creds_info = user_data.get("google_creds") if user_data else None
-        oauth_code = user_data.get("google_oauth_code") if user_data else None
 
     # If still not found, run OAuth flow and store
     if not creds_info:
         import urllib.parse
         redirect_uri = REDIRECT_URI
         query_params = st.query_params
-        code = query_params.get("code", [None])[0] or oauth_code
+        code = query_params.get("code", [None])[0]
 
         if redirect_uri and not redirect_uri.startswith("http://localhost"):
             # Cloud/web flow
@@ -60,18 +58,15 @@ def get_drive_service():
             if code:
                 flow.fetch_token(code=code)
                 creds = flow.credentials
-
                 # Save immediately to session and MongoDB
                 creds_info = json.loads(creds.to_json())
                 st.session_state["google_creds"] = creds_info
-                st.session_state["google_oauth_code"] = code
                 if username:
                     chats_col.update_one(
                         {"username": username},
-                        {"$set": {"google_creds": creds_info, "google_oauth_code": code}},
+                        {"$set": {"google_creds": creds_info}},
                         upsert=True
                     )
-
                 # Clear the code from URL and reload app
                 st.query_params
                 st.rerun()
@@ -84,7 +79,6 @@ def get_drive_service():
             # Local development
             flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
             creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
-
             # Save immediately after OAuth
             creds_info = json.loads(creds.to_json())
             st.session_state["google_creds"] = creds_info
