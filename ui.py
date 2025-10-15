@@ -273,7 +273,8 @@ def render_sidebar():
                     })
                     if 'user_collections' not in st.session_state:
                         st.session_state['user_collections'] = []
-                    st.session_state['user_collections'].append(user_collection_name)
+                    if user_collection_name not in st.session_state['user_collections']:
+                        st.session_state['user_collections'].append(user_collection_name)
 
                     # Build embeddings/index for this user's collection using in-memory bytes
                     from embeddings_utils import build_or_load_index
@@ -320,7 +321,8 @@ def render_sidebar():
                 })
                 if 'user_collections' not in st.session_state:
                     st.session_state['user_collections'] = []
-                st.session_state['user_collections'].append(user_collection_name)
+                if user_collection_name not in st.session_state['user_collections']:
+                    st.session_state['user_collections'].append(user_collection_name)
 
                 # Build embeddings/index for this user's collection using in-memory bytes
                 from embeddings_utils import build_or_load_index
