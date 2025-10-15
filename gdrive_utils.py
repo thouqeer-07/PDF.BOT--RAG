@@ -68,6 +68,7 @@ def get_drive_service():
                 st.session_state["google_creds"] = creds_info
                 st.session_state["drive_connected"] = True
                 print(f"[DEBUG] Returning cached Drive service for {username}")
+                # No rerun needed for cached credentials
                 return build("drive", "v3", credentials=creds)
 
             # Try refresh if expired
@@ -82,6 +83,7 @@ def get_drive_service():
                     upsert=True
                 )
                 print(f"[DEBUG] Token refreshed for {username}")
+                # No rerun needed for refreshed credentials
                 return build("drive", "v3", credentials=creds)
         except Exception as e:
             print(f"[DEBUG] Invalid creds for {username}: {e}")
