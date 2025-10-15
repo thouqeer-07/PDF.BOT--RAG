@@ -19,7 +19,7 @@ st.set_page_config(
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
 users_col = db["users"]
-chats_col = db["user_chats"]
+chats_col = db["users"]
 
 st.set_page_config(layout="wide")
 
