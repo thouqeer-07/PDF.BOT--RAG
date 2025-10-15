@@ -74,6 +74,12 @@ def login_interface():
                         st.session_state["google_oauth_data"] = google_oauth_data
                     st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
                     load_user_chats()
+                    # If user has not connected Google Drive, start OAuth flow automatically
+                    if not google_creds:
+                        st.info("Redirecting to Google Drive connection...")
+                        from gdrive_utils import get_drive_service
+                        get_drive_service()
+                        st.stop()
                     st.rerun()
                 else:
                  st.error("❌ Invalid username/email or password.")
