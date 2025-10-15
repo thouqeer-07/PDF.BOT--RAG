@@ -259,12 +259,9 @@ def render_sidebar():
                     # Reuse existing chat interface and collection
                     st.session_state.selected_pdf = pdf_name
                     st.session_state.current_collection = user_collection_name
+        
+                    st.toast(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
                     st.rerun()
-                    for _ in range(1):  # Show it multiple times
-                     st.toast(f"📄 PDF '{pdf_name}'  already exists. Reusing previous chat and collection.", icon="✅")
-                     time.sleep(4)
-                    #st.toast(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
-                    
                 else:
                     # Store file_id in pdf_history and user_collections
                     if 'pdf_history' not in st.session_state:
@@ -314,7 +311,7 @@ def render_sidebar():
                         st.session_state['pdf_chats'] = {}
                     st.session_state.pdf_chats[pdf_name] = []
                     save_user_chats()
-                    st.toast(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
+                    st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
                 if 'pdf_history' not in st.session_state:
                     st.session_state['pdf_history'] = []
                 st.session_state['pdf_history'].append({
@@ -362,7 +359,7 @@ def render_sidebar():
                     st.session_state['pdf_chats'] = {}
                 st.session_state.pdf_chats[pdf_name] = []
                 save_user_chats()
-                st.toast(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
+                st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
 
         # --- Sidebar PDF list ---
         pdf_names = [
@@ -405,7 +402,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑️ ", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
+                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
 
