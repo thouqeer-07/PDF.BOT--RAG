@@ -45,54 +45,58 @@ def get_drive_service():
         user_data = chats_col.find_one({"username": username})
         creds_info = user_data.get("google_creds") if user_data else None
 
-    # If still not found, run OAuth flow and store
-    if not creds_info:
-        import urllib.parse
-        redirect_uri = REDIRECT_URI
-        query_params = st.query_params
-        code = query_params.get("code", [None])[0]
+    # If credentials exist, return Drive service immediately
+    if creds_info:
+        creds = Credentials.from_authorized_user_info(creds_info)
+        return build("drive", "v3", credentials=creds)
 
-        if redirect_uri and not redirect_uri.startswith("http://localhost"):
-            # Cloud/web flow
-            flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-            if not code:
-                # Always prompt for Google login if no code
-                auth_url, _ = flow.authorization_url(prompt="consent")
-                st.markdown(f"[Connect to Google Drive]({auth_url})")
-                st.stop()
-            flow.fetch_token(code=code)
-            creds = flow.credentials
-            # Save immediately to session and MongoDB
-            creds_info = json.loads(creds.to_json())
-            st.session_state["google_creds"] = creds_info
-            if username:
-                chats_col.update_one(
-                    {"username": username},
-                    {"$set": {"google_creds": creds_info}},
-                    upsert=True
-                )
-            # Clear the code from URL and reload app
-            st.query_params
-            st.rerun()
-            st.toast("Connected to Google Drive!", icon="✅")
-        else:
-            # Local development
-            flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
-            creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
-            # Save immediately after OAuth
-            creds_info = json.loads(creds.to_json())
-            st.session_state["google_creds"] = creds_info
-            if username:
-                chats_col.update_one(
-                    {"username": username},
-                    {"$set": {"google_creds": creds_info}},
-                    upsert=True
-                )
-            st.toast("Connected to Google Drive!", icon="✅")
-            st.success("Google Drive authentication successful. Please login again to continue.")
-            st.session_state.clear()
-            st.session_state["auth_interface"] = "login"
+    # If still not found, run OAuth flow and store
+    import urllib.parse
+    redirect_uri = REDIRECT_URI
+    query_params = st.query_params
+    code = query_params.get("code", [None])[0]
+
+    if redirect_uri and not redirect_uri.startswith("http://localhost"):
+        # Cloud/web flow
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+        if not code:
+            # Always prompt for Google login if no code
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            st.markdown(f"[Connect to Google Drive]({auth_url})")
             st.stop()
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+        # Save immediately to session and MongoDB
+        creds_info = json.loads(creds.to_json())
+        st.session_state["google_creds"] = creds_info
+        if username:
+            chats_col.update_one(
+                {"username": username},
+                {"$set": {"google_creds": creds_info}},
+                upsert=True
+            )
+        # Clear the code from URL and reload app
+        st.query_params
+        st.rerun()
+        st.toast("Connected to Google Drive!", icon="✅")
+    else:
+        # Local development
+        flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
+        creds = flow.run_local_server(port=int(OAUTH_PORT), prompt="consent", authorization_prompt_message="")
+        # Save immediately after OAuth
+        creds_info = json.loads(creds.to_json())
+        st.session_state["google_creds"] = creds_info
+        if username:
+            chats_col.update_one(
+                {"username": username},
+                {"$set": {"google_creds": creds_info}},
+                upsert=True
+            )
+        st.toast("Connected to Google Drive!", icon="✅")
+        st.success("Google Drive authentication successful. Please login again to continue.")
+        st.session_state.clear()
+        st.session_state["auth_interface"] = "login"
+        st.stop()
 
 
     # ...existing code...
