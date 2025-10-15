@@ -119,10 +119,12 @@ def get_drive_service():
                 {"$set": {"google_creds": creds_info, "google_oauth_data": oauth_data}},
                 upsert=True
             )
-            print(f"[DEBUG] OAuth success, rerunning app.")
-            st.query_params
-            st.rerun()
-            st.toast("Connected to Google Drive!", icon="✅")
+        print(f"[DEBUG] OAuth success, clearing session and redirecting to login.")
+        st.toast("Google Drive connected! Please log in to continue.", icon="✅")
+        st.session_state.clear()
+        st.session_state["auth_interface"] = "login"
+        st.success("Google Drive authentication successful. Please login again to continue.")
+        st.stop()
     else:
         # Local development
         flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
