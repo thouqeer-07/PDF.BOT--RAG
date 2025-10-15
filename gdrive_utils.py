@@ -147,6 +147,7 @@ def get_drive_service():
 
             st.toast("✅ Google Drive connected successfully!")
             print(f"[DEBUG] OAuth success for {username}")
+            st.rerun()
             return build("drive", "v3", credentials=creds)
 
         except Exception as e:
@@ -182,6 +183,7 @@ def get_drive_service():
 
         st.toast("✅ Google Drive connected locally!")
         print(f"[DEBUG] Local OAuth success for {username}")
+        st.rerun()
         return build("drive", "v3", credentials=creds)
 
 
