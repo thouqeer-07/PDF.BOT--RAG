@@ -146,12 +146,18 @@ def show_before_message_ui(send_message, selected_pdf):
 
     # Handle input
     if selected_suggestion:
+        if not selected_pdf:
+            st.error("Please select or upload a PDF before sending a message.")
+            return
         st.session_state.input_text = selected_suggestion
         st.session_state.chat_started = True
         send_message()
         save_user_chats()  # <-- Save after user input
         st.rerun()
     elif user_input:
+        if not selected_pdf:
+            st.error("Please select or upload a PDF before sending a message.")
+            return
         st.session_state.input_text = user_input
         st.session_state.chat_started = True
         send_message()
