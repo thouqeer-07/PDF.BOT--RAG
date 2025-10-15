@@ -237,12 +237,9 @@ def render_sidebar():
         if not creds_ok:
             st.warning("Google Drive not connected. Please connect to upload/download files.")
             # Show only the Connect to Google Drive link
-            from gdrive_utils import get_drive_service
-            # Get the OAuth link from get_drive_service (without triggering rerun)
-            from config import REDIRECT_URI, SCOPES
-            import streamlit as st
             import json
             from google_auth_oauthlib.flow import Flow
+            from config import REDIRECT_URI, SCOPES
             client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
             flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
             auth_url, _ = flow.authorization_url(prompt="consent", state=username)
