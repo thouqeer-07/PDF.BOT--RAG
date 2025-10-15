@@ -108,16 +108,21 @@ def get_drive_service():
         st.session_state["google_creds"] = creds_info
         st.session_state["google_oauth_data"] = oauth_data
         print(f"[DEBUG] Saving new creds and oauth_data to MongoDB for user {username}")
-        if username:
+        if not username:
+            st.error("Google login session lost. Please log in again before connecting to Drive.")
+            st.session_state.clear()
+            st.session_state["auth_interface"] = "login"
+            st.stop()
+        else:
             chats_col.update_one(
                 {"username": username},
                 {"$set": {"google_creds": creds_info, "google_oauth_data": oauth_data}},
                 upsert=True
             )
-        print(f"[DEBUG] OAuth success, rerunning app.")
-        st.query_params
-        st.rerun()
-        st.toast("Connected to Google Drive!", icon="✅")
+            print(f"[DEBUG] OAuth success, rerunning app.")
+            st.query_params
+            st.rerun()
+            st.toast("Connected to Google Drive!", icon="✅")
     else:
         # Local development
         flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
