@@ -40,7 +40,13 @@ def get_drive_service():
     chats_col = db["users"]
 
     username = st.session_state.get("username") or st.session_state.get("persist_username")
-    
+    # Try to restore username from OAuth 'state' param if missing
+    if not username:
+        query_params = st.query_params
+        state_username = query_params.get("state")
+        if state_username:
+            st.session_state["username"] = state_username
+            username = state_username
     if not username:
         st.error("Please log in before connecting to Google Drive.")
         st.stop()
