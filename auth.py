@@ -15,26 +15,18 @@ st.set_page_config(
         layout="wide"
     )
 # --- MongoDB Setup ---
-
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
 users_col = db["users"]
 chats_col = db["users"]
-
 st.set_page_config(layout="wide")
-
 
 # --- Convert image to base64 ---
 def img_to_base64(path):
     with open(path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
-
-
 log_icon_base64 = img_to_base64("assets/LOGIN.png")
-
-
-
 # --- MongoDB user DB helper functions ---
 def get_user_by_username_or_email(identifier):
     return users_col.find_one({"$or": [{"username": identifier}, {"email": identifier}]})
@@ -53,14 +45,6 @@ def create_user(username, password, email):
 
 def delete_user(username):
     users_col.delete_one({"username": username})
-
-
-
-
-
-
-
-
 
 # --- LOGIN INTERFACE ---
 def login_interface():
@@ -91,8 +75,8 @@ def login_interface():
                     st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
                     load_user_chats()
                     st.rerun()
-            else:
-                st.error("❌ Invalid username/email or password.")
+                else:
+                 st.error("❌ Invalid username/email or password.")
 
         if st.button("New User? Create an account", key="goto_create"):
             st.session_state["auth_interface"] = "create_account"
