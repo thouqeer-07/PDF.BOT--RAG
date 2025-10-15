@@ -107,8 +107,7 @@ def get_drive_service():
             )
             st.session_state["google_oauth_code"] = code
             # Remove ?code=... from URL to avoid rerun loop
-            st.query_params()
-            st.rerun()
+            st.query_params
 
         # --- Reuse code from Mongo or session if exists ---
         code = st.session_state.get("google_oauth_code") or \
