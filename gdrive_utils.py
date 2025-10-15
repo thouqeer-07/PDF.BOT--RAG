@@ -55,26 +55,26 @@ def get_drive_service():
         if redirect_uri and not redirect_uri.startswith("http://localhost"):
             # Cloud/web flow
             flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-            if code:
-                flow.fetch_token(code=code)
-                creds = flow.credentials
-                # Save immediately to session and MongoDB
-                creds_info = json.loads(creds.to_json())
-                st.session_state["google_creds"] = creds_info
-                if username:
-                    chats_col.update_one(
-                        {"username": username},
-                        {"$set": {"google_creds": creds_info}},
-                        upsert=True
-                    )
-                # Clear the code from URL and reload app
-                st.query_params
-                st.rerun()
-                st.toast("Connected to Google Drive!", icon="✅")
-            else:
+            if not code:
+                # Always prompt for Google login if no code
                 auth_url, _ = flow.authorization_url(prompt="consent")
                 st.markdown(f"[Connect to Google Drive]({auth_url})")
                 st.stop()
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            # Save immediately to session and MongoDB
+            creds_info = json.loads(creds.to_json())
+            st.session_state["google_creds"] = creds_info
+            if username:
+                chats_col.update_one(
+                    {"username": username},
+                    {"$set": {"google_creds": creds_info}},
+                    upsert=True
+                )
+            # Clear the code from URL and reload app
+            st.query_params
+            st.rerun()
+            st.toast("Connected to Google Drive!", icon="✅")
         else:
             # Local development
             flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
