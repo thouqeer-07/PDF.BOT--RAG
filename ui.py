@@ -260,7 +260,7 @@ def render_sidebar():
                     st.session_state.selected_pdf = pdf_name
                     st.session_state.current_collection = user_collection_name
         
-                    st.toast(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
+                    st.success(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
                     st.rerun()
                 else:
                     # Store file_id in pdf_history and user_collections
