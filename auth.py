@@ -77,13 +77,20 @@ def login_interface():
         password = st.text_input("Password", type="password", key="login_pass")
 
         if st.button("Login", key="login_btn"):
-            user_doc = get_user_by_username_or_email(identifier)
-            if user_doc and user_doc.get("password") == password:
-                st.session_state["authenticated"] = True
-                st.session_state["username"] = user_doc["username"]
-                load_user_chats()
-                st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
-                st.rerun()
+                user_doc = get_user_by_username_or_email(identifier)
+                if user_doc and user_doc.get("password") == password:
+                    st.session_state["authenticated"] = True
+                    st.session_state["username"] = user_doc["username"]
+                    # Reload Google Drive credentials from MongoDB
+                    google_creds = user_doc.get("google_creds")
+                    google_oauth_data = user_doc.get("google_oauth_data")
+                    if google_creds:
+                        st.session_state["google_creds"] = google_creds
+                    if google_oauth_data:
+                        st.session_state["google_oauth_data"] = google_oauth_data
+                    st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
+                    load_user_chats()
+                    st.rerun()
             else:
                 st.error("❌ Invalid username/email or password.")
 
