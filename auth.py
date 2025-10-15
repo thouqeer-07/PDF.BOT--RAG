@@ -1,4 +1,4 @@
-
+#===== auth.py ====
 
 import streamlit as st
 import os  # Only for non-file ops
@@ -65,6 +65,7 @@ def login_interface():
                 if user_doc and user_doc.get("password") == password:
                     st.session_state["authenticated"] = True
                     st.session_state["username"] = user_doc["username"]
+                    st.session_state["persist_username"] = user_doc["username"] # Persist username for session
                     # Reload Google Drive credentials from MongoDB
                     google_creds = user_doc.get("google_creds")
                     google_oauth_data = user_doc.get("google_oauth_data")
@@ -74,12 +75,6 @@ def login_interface():
                         st.session_state["google_oauth_data"] = google_oauth_data
                     st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
                     load_user_chats()
-                    # If user has not connected Google Drive, start OAuth flow automatically
-                    if not google_creds:
-                        st.info("Redirecting to Google Drive connection...")
-                        from gdrive_utils import get_drive_service
-                        get_drive_service()
-                        st.stop()
                     st.rerun()
                 else:
                  st.error("❌ Invalid username/email or password.")

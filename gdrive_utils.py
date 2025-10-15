@@ -26,6 +26,7 @@ flow = Flow.from_client_config(client_config, scopes=SCOPES)
 # Temporary port for OAuth, must be different from Streamlit's (8501)
 from config import OAUTH_PORT
 def get_drive_service():
+
     """Handles Google OAuth (Streamlit + MongoDB compatible) and returns authorized Drive service."""
     from pymongo import MongoClient
     from google.oauth2.credentials import Credentials
@@ -38,7 +39,7 @@ def get_drive_service():
     db = client["pdfbot"]
     chats_col = db["users"]
 
-    username = st.session_state.get("username")
+    username = st.session_state.get("username") or st.session_state.get("persist_username")
     if not username:
         st.error("Please log in before connecting to Google Drive.")
         st.stop()
@@ -86,9 +87,12 @@ def get_drive_service():
         # --- Check for OAuth code in query params ---
         query_params = st.query_params
         code = query_params.get("code")
+        state = query_params.get("state")
+
 
         # --- Save OAuth code instantly to Mongo if present ---
         if code:
+            print(f"[DEBUG] OAuth code received for user {username}: {code[:10]}...")
             chats_col.update_one(
                 {"username": username},
                 {"$set": {"google_oauth_code": code}},
@@ -96,7 +100,7 @@ def get_drive_service():
             )
             st.session_state["google_oauth_code"] = code
             # Remove ?code=... from URL to avoid rerun loop
-            st.experimental_set_query_params()
+            st.query_params
             st.rerun()
 
         # --- Reuse code from Mongo or session if exists ---
