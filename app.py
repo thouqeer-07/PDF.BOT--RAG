@@ -13,6 +13,7 @@ if "code" in st.query_params:
     service = get_drive_service()
     st.success("✅ Google Drive connected successfully!")
     st.stop()
+    st.rerun()
 
 
 from ui import setup_ui, render_sidebar, render_chat, render_main_ui

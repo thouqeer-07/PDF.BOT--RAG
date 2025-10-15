@@ -153,9 +153,9 @@ def get_drive_service():
             st.success("✅ Google Drive connected successfully!")
             st.success("Go Back to the main app to continue.")
             print(f"[DEBUG] OAuth success for {username}")
-            
-            return build("drive", "v3", credentials=creds)
             st.rerun()
+            return build("drive", "v3", credentials=creds)
+        
 
         except Exception as e:
             print(f"[DEBUG] OAuth error for {username}: {e}")
