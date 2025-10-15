@@ -93,6 +93,10 @@ def get_drive_service():
                 upsert=True
             )
         st.toast("Connected to Google Drive!", icon="✅")
+        st.success("Google Drive authentication successful. Please login again to continue.")
+        st.session_state.clear()
+        st.session_state["auth_interface"] = "login"
+        st.stop()
 
 
     # ...existing code...
