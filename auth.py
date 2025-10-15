@@ -220,10 +220,7 @@ def require_login():
                 # Logout button
                 if st.button("🚪 Logout"):
                     save_user_chats()
-                    st.session_state["authenticated"] = False
-                    st.session_state["username"] = ""
-                    st.session_state["pdf_chats"] = {}
-                    st.session_state["selected_pdf"] = None
+                    st.session_state.clear()
                     st.success("You have been logged out.")
                     st.rerun()
 
