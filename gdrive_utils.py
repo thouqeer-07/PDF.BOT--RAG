@@ -80,17 +80,15 @@ def get_drive_service():
         flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
         if not code or not isinstance(code, str) or len(code) < 10:
             print(f"[DEBUG] No valid code found in query params. Showing connect link.")
-            # Persist username in query params for OAuth redirect
-            import urllib.parse
+            # Persist username in MongoDB with pending_oauth flag
             username_for_oauth = username or st.session_state.get("username")
-            auth_url, _ = flow.authorization_url(prompt="consent")
             if username_for_oauth:
-                # Add username to auth_url as query param
-                parsed = urllib.parse.urlparse(auth_url)
-                q = urllib.parse.parse_qs(parsed.query)
-                q["username"] = [username_for_oauth]
-                new_query = urllib.parse.urlencode(q, doseq=True)
-                auth_url = urllib.parse.urlunparse(parsed._replace(query=new_query))
+                chats_col.update_one(
+                    {"username": username_for_oauth},
+                    {"$set": {"pending_oauth": True}},
+                    upsert=True
+                )
+            auth_url, _ = flow.authorization_url(prompt="consent")
             st.markdown(f"[Connect to Google Drive]({auth_url})")
             st.stop()
         try:
@@ -117,11 +115,15 @@ def get_drive_service():
         }
         st.session_state["google_creds"] = creds_info
         st.session_state["google_oauth_data"] = oauth_data
-        # Restore username from query params if missing
+        # Restore username from MongoDB pending_oauth flag if missing
         if not username:
-            username = query_params.get("username", [None])[0]
-            if username:
+            user_data = chats_col.find_one({"pending_oauth": True})
+            if user_data and user_data.get("username"):
+                username = user_data["username"]
                 st.session_state["username"] = username
+            # Clear the pending_oauth flag
+            if user_data:
+                chats_col.update_one({"username": username}, {"$unset": {"pending_oauth": ""}})
         print(f"[DEBUG] Saving new creds and oauth_data to MongoDB for user {username}")
         if not username:
             st.error("Google login session lost. Please log in again before connecting to Drive.")
