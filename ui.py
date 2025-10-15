@@ -237,11 +237,11 @@ def render_sidebar():
         if not creds_ok:
             st.warning("Google Drive not connected. Please connect to upload/download files.")
             # Show Connect to Drive button
-            from gdrive_utils import handle_oauth_callback
-            if st.button("Connect to Google Drive", key="connect_drive_btn"):
+            #from gdrive_utils import handle_oauth_callback
+            #if st.button("Connect to Google Drive", key="connect_drive_btn"):
                 # This will trigger OAuth flow
-                handle_oauth_callback()
-                st.rerun()
+                #handle_oauth_callback()
+                #st.rerun()
         else:
             uploaded_pdf = st.file_uploader("Choose a PDF file", type=["pdf"], key="pdf_uploader")
             upload_clicked = st.button("Upload", key="upload_pdf_button")
