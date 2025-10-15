@@ -53,14 +53,16 @@ def get_drive_service():
             if hasattr(creds, 'expired') and creds.expired and hasattr(creds, 'refresh_token') and creds.refresh_token:
                 from google.auth.transport.requests import Request
                 creds.refresh(Request())
-                # Save refreshed creds
-                st.session_state["google_creds"] = json.loads(creds.to_json())
+                refreshed_creds = json.loads(creds.to_json())
+                st.session_state["google_creds"] = refreshed_creds
+                print(f"[DEBUG] Saving refreshed creds to MongoDB for user {username}")
                 if username:
                     chats_col.update_one(
                         {"username": username},
-                        {"$set": {"google_creds": json.loads(creds.to_json())}},
+                        {"$set": {"google_creds": refreshed_creds}},
                         upsert=True
                     )
+            print(f"[DEBUG] Returning Drive service for user {username}")
             return build("drive", "v3", credentials=creds)
         except Exception as e:
             st.error(f"Google Drive authentication failed: {e}. Please reconnect.")
@@ -90,6 +92,7 @@ def get_drive_service():
         # Save immediately to session and MongoDB
         creds_info = json.loads(creds.to_json())
         st.session_state["google_creds"] = creds_info
+        print(f"[DEBUG] Saving new creds to MongoDB for user {username}")
         if username:
             chats_col.update_one(
                 {"username": username},
@@ -107,6 +110,7 @@ def get_drive_service():
         # Save immediately after OAuth
         creds_info = json.loads(creds.to_json())
         st.session_state["google_creds"] = creds_info
+        print(f"[DEBUG] Saving new creds to MongoDB for user {username}")
         if username:
             chats_col.update_one(
                 {"username": username},
