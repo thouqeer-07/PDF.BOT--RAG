@@ -53,18 +53,24 @@ def get_drive_service():
     # If still not found, run OAuth flow and store
     import urllib.parse
     redirect_uri = REDIRECT_URI
-    query_params = st.query_params
+    query_params = st.query_params  # property, not function
     code = query_params.get("code", [None])[0]
 
     if redirect_uri and not redirect_uri.startswith("http://localhost"):
         # Cloud/web flow
         flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-        if not code:
-            # Always prompt for Google login if no code
+        if not code or not isinstance(code, str) or len(code) < 10:
+            # Always prompt for Google login if no code or malformed code
             auth_url, _ = flow.authorization_url(prompt="consent")
             st.markdown(f"[Connect to Google Drive]({auth_url})")
             st.stop()
-        flow.fetch_token(code=code)
+        try:
+            flow.fetch_token(code=code)
+        except Exception as e:
+            st.error(f"Google OAuth failed: {e}. Please try again.")
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            st.markdown(f"[Connect to Google Drive]({auth_url})")
+            st.stop()
         creds = flow.credentials
         # Save immediately to session and MongoDB
         creds_info = json.loads(creds.to_json())
