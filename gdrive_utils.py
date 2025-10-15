@@ -45,10 +45,25 @@ def get_drive_service():
         user_data = chats_col.find_one({"username": username})
         creds_info = user_data.get("google_creds") if user_data else None
 
-    # If credentials exist, return Drive service immediately
+    # If credentials exist and are valid, return Drive service immediately
     if creds_info:
-        creds = Credentials.from_authorized_user_info(creds_info)
-        return build("drive", "v3", credentials=creds)
+        try:
+            creds = Credentials.from_authorized_user_info(creds_info)
+            # Optionally check if token is expired and refresh if needed
+            if hasattr(creds, 'expired') and creds.expired and hasattr(creds, 'refresh_token') and creds.refresh_token:
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+                # Save refreshed creds
+                st.session_state["google_creds"] = json.loads(creds.to_json())
+                if username:
+                    chats_col.update_one(
+                        {"username": username},
+                        {"$set": {"google_creds": json.loads(creds.to_json())}},
+                        upsert=True
+                    )
+            return build("drive", "v3", credentials=creds)
+        except Exception as e:
+            st.error(f"Google Drive authentication failed: {e}. Please reconnect.")
 
     # If still not found, run OAuth flow and store
     import urllib.parse
