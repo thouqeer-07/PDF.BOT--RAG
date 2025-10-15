@@ -48,6 +48,7 @@ def get_drive_service():
     # If credentials exist and are valid, return Drive service immediately
     if creds_info:
         try:
+            print(f"[DEBUG] creds_info found for user {username}")
             creds = Credentials.from_authorized_user_info(creds_info)
             # Optionally check if token is expired and refresh if needed
             if hasattr(creds, 'expired') and creds.expired and hasattr(creds, 'refresh_token') and creds.refresh_token:
@@ -65,6 +66,7 @@ def get_drive_service():
             print(f"[DEBUG] Returning Drive service for user {username}")
             return build("drive", "v3", credentials=creds)
         except Exception as e:
+            print(f"[DEBUG] Exception in creds_info block: {e}")
             st.error(f"Google Drive authentication failed: {e}. Please reconnect.")
 
     # If still not found, run OAuth flow and store
@@ -77,13 +79,15 @@ def get_drive_service():
         # Cloud/web flow
         flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
         if not code or not isinstance(code, str) or len(code) < 10:
-            # Always prompt for Google login if no code or malformed code
+            print(f"[DEBUG] No valid code found in query params. Showing connect link.")
             auth_url, _ = flow.authorization_url(prompt="consent")
             st.markdown(f"[Connect to Google Drive]({auth_url})")
             st.stop()
         try:
+            print(f"[DEBUG] Attempting to fetch token with code: {code}")
             flow.fetch_token(code=code)
         except Exception as e:
+            print(f"[DEBUG] Exception during fetch_token: {e}")
             st.error(f"Google OAuth failed: {e}. Please try again.")
             auth_url, _ = flow.authorization_url(prompt="consent")
             st.markdown(f"[Connect to Google Drive]({auth_url})")
@@ -99,7 +103,7 @@ def get_drive_service():
                 {"$set": {"google_creds": creds_info}},
                 upsert=True
             )
-        # Clear the code from URL and reload app
+        print(f"[DEBUG] OAuth success, rerunning app.")
         st.query_params
         st.rerun()
         st.toast("Connected to Google Drive!", icon="✅")
@@ -117,6 +121,7 @@ def get_drive_service():
                 {"$set": {"google_creds": creds_info}},
                 upsert=True
             )
+        print(f"[DEBUG] Local OAuth success, clearing session and stopping.")
         st.toast("Connected to Google Drive!", icon="✅")
         st.success("Google Drive authentication successful. Please login again to continue.")
         st.session_state.clear()
