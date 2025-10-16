@@ -4,7 +4,6 @@ SYSTEM_PROMPT = (
     "You are a precise, concise assistant.\n"
     "If the answer is partially available, use it. If unsure, explain why.\n"
     "If the answer is not in the context, say you don't know based on the provided PDF.\n"
-    "Use bullet points or numbered lists for clarity where appropriate."
 )
 
 QA_TEMPLATE = """
