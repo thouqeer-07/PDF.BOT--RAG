@@ -26,12 +26,8 @@ def img_to_base64(path):
     with open(path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode()
-welcome = img_to_base64("assets/MYLOGO.png")
-def img_to_base64(path):
-    with open(path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
 log_icon_base64 = img_to_base64("assets/LOGIN.png")
+welcome = img_to_base64("assets/MYLOGO.png")
 # --- MongoDB user DB helper functions ---
 def get_user_by_username_or_email(identifier):
     return users_col.find_one({"$or": [{"username": identifier}, {"email": identifier}]})
