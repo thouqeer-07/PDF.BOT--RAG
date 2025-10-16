@@ -18,7 +18,7 @@ QA_TEMPLATE = """
 
 # Instructions:
 - Provide a short, friendly answer (1-3 sentences) followed by a 1-3 bullet key points list when helpful.
-- Use simple HTML tags only (<strong>, <em>, <ul>, <li>, <p>, <br>) to make the answer look neat in the chat UI.
+- Use simple HTML tags only (<strong>, <em>, <ul>, <p>, <br>) to make the answer look neat in the chat UI.
 - Begin the answer with a short one-line summary in bold (<strong>).</n+- If you cite sources, include them at the end in parentheses (e.g., (p. 12)).
 - If the answer is not present in the context, reply: "I don't see that information in the provided PDF." inside a single <p> tag.
 """
