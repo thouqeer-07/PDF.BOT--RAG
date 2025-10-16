@@ -11,7 +11,7 @@ from gdrive_utils import get_drive_service, download_pdf_from_drive
 
 st.set_page_config(
         page_title="RAG Chatbot",
-        page_icon="assets/MYLOGO.png",  
+        page_icon="assets/LOGO.png",  
         layout="wide"
     )
 # --- MongoDB Setup ---
@@ -62,6 +62,14 @@ def login_interface():
         if st.session_state.get("account_created", False):
             st.success("✅ Account created successfully! Please login using your credentials.")
             st.session_state["account_created"] = False
+        # Apply CSS for fixed width
+        st.markdown("""
+         <style>
+         div[data-testid="stTextInput"] > div > input {
+         width: 300px;  /* Set your fixed width here */
+         }
+         </style>
+         """, unsafe_allow_html=True)
 
         identifier = st.text_input("Username or Email", key="login_identifier")
         password = st.text_input("Password", type="password", key="login_pass")
