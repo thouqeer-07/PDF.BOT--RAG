@@ -1,8 +1,6 @@
 # ==== ui.py ====
 
 import streamlit as st
-import html as _html
-import re as _re
 import time
 import base64
 from pymongo import MongoClient
@@ -11,64 +9,6 @@ from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_fr
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
 chats_col = db["users"]
-
-
-def sanitize_html(content: str) -> str:
-    """Safely allow only a small set of full HTML fragments.
-
-    Approach:
-    - Scan the original content and replace any full allowed HTML fragments (e.g. <strong>...</strong>, <li>...</li>,
-      or full <a href="...">...</a>) with placeholders.
-    - Escape the entire string (so any stray '<' or malformed tags are neutralized).
-    - Replace placeholders with the original allowed fragments (which were validated before placeholdering).
-
-    This guarantees that only full, well-formed allowed fragments are rendered as HTML; everything else is escaped.
-    """
-    if not content:
-        return ""
-
-    allow_tags = ["strong", "em", "ul", "li", "p", "br", "b", "i"]
-    placeholders = {}
-    placeholder_counter = 0
-
-    s = content
-
-    # 1) extract full <a href="...">...</a> fragments first
-    for m in _re.finditer(r'<a\s+href="([^"]+)">(.*?)</a>', s, flags=_re.IGNORECASE | _re.DOTALL):
-        href = m.group(1)
-        inner = m.group(2)
-        # Basic validation of href
-        if href.startswith(("http://", "https://", "mailto:", "data:")):
-            ph = f"__ALLOWED_HTML_{placeholder_counter}__"
-            placeholders[ph] = f'<a href="{href}" target="_blank" rel="noopener">{_html.escape(inner)}</a>'
-            s = s.replace(m.group(0), ph)
-            placeholder_counter += 1
-
-    # 2) extract full allowed tags like <strong>...</strong> and <li>...</li>
-    for tag in allow_tags:
-        pattern = rf'<{tag}>(.*?)</{tag}>'
-        for m in _re.finditer(pattern, s, flags=_re.IGNORECASE | _re.DOTALL):
-            inner = m.group(1)
-            ph = f"__ALLOWED_HTML_{placeholder_counter}__"
-            placeholders[ph] = f'<{tag}>{_html.escape(inner)}</{tag}>'
-            s = s.replace(m.group(0), ph)
-            placeholder_counter += 1
-
-    # 3) extract self-closing <br/> occurrences
-    for m in _re.finditer(r'<br\s*/?>', s, flags=_re.IGNORECASE):
-        ph = f"__ALLOWED_HTML_{placeholder_counter}__"
-        placeholders[ph] = '<br/>'
-        s = s.replace(m.group(0), ph)
-        placeholder_counter += 1
-
-    # 4) escape everything
-    escaped = _html.escape(s)
-
-    # 5) restore placeholders with their safe HTML
-    for ph, html_fragment in placeholders.items():
-        escaped = escaped.replace(_html.escape(ph), html_fragment)
-
-    return escaped
 
 
 
@@ -648,13 +588,7 @@ def render_chat():
         )
 
         # Bot response
-        bot_raw = chat.get('bot', "")  # original model text
-        bot_html = chat.get('bot_html')  # sanitized HTML stored after rendering
-        # Compute one safe HTML string to render: prefer cached bot_html
-        if bot_html:
-            safe_bot = bot_html
-        else:
-            safe_bot = sanitize_html(bot_raw)
+        bot_content = chat['bot']
         download_commands = [
             "⬇️ download pdf",
             "download pdf",
@@ -683,16 +617,13 @@ def render_chat():
             else:
                 bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> is not available for download."
 
-            # Re-sanitize after bot_content may have changed
-            safe_bot = sanitize_html(bot_content)
-
             st.markdown(
                 f"""
                 <div class='chat-row bot-row'>
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
                         <img src=\"data:image/png;base64,{bot_icon_base64}\" style=\"width:32px; height:32px;\" />
                     </div>
-                    <div class='chat-bubble bot-msg'>{safe_bot}</div>
+                    <div class='chat-bubble bot-msg'>{bot_content}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -701,7 +632,7 @@ def render_chat():
         elif i == len(chats) - 1 and not chat.get("animated", False):
             # Show 'Bot is thinking...' interface before typewriter effect
             thinking_container = st.empty()
-            st.markdown(
+            thinking_container.markdown(
                 f"""
                 <div class='chat-row bot-row'>
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
@@ -714,10 +645,8 @@ def render_chat():
             )
             time.sleep(0.7)  # Simulate thinking delay
             thinking_container.empty()
-            # Use sanitized content for the typewriter display (this writes directly to the page)
-            _ = typewriter(safe_bot)
-            # Cache sanitized HTML so future renders don't re-sanitize or double-escape
-            chat['bot_html'] = safe_bot
+            final_text = typewriter(bot_content)
+            chat['bot'] = final_text
             chat['animated'] = True
         else:
             st.markdown(
@@ -726,7 +655,7 @@ def render_chat():
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
                         <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
                     </div>
-                    <div class='chat-bubble bot-msg'>{safe_bot}</div>
+                    <div class='chat-bubble bot-msg'>{bot_content}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
