@@ -54,7 +54,7 @@ def login_interface():
         st.markdown(f"""
           <h3 style='text-align: center;'>
           <img src='data:image/png;base64,{welcome_icon_base64}' width='30' style='vertical-align: middle; margin-right: 10px;'>
-          Welcome To PDF Chat Bot!
+          Welcome To PDF Bot!
           </h3>
           """, unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Login</h4>", unsafe_allow_html=True)
@@ -62,14 +62,7 @@ def login_interface():
         if st.session_state.get("account_created", False):
             st.success("✅ Account created successfully! Please login using your credentials.")
             st.session_state["account_created"] = False
-        # Apply CSS for fixed width
-        st.markdown("""
-         <style>
-         div[data-testid="stTextInput"] > div > input {
-         width: 600px !important;  /* Set your fixed width here */
-         }
-         </style>
-         """, unsafe_allow_html=True)
+        
 
         identifier = st.text_input("Username or Email", key="login_identifier")
         password = st.text_input("Password", type="password", key="login_pass")
