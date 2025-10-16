@@ -404,7 +404,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
+                    if st.button("Delete", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
 

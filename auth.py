@@ -50,7 +50,7 @@ def delete_user(username):
 def login_interface():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("<h3 style='text-align: center;'>👋 Welcome Back!</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Welcome To PDF Chat Bot!</h3>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Login</h4>", unsafe_allow_html=True)
 
         if st.session_state.get("account_created", False):
