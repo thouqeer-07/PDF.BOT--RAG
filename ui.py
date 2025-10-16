@@ -14,33 +14,59 @@ chats_col = db["users"]
 
 
 def sanitize_html(content: str) -> str:
-    """Escape everything then unescape a small allowlist of safe tags.
+    """Safely allow only a small set of full HTML fragments.
 
-    This prevents malformed tags (like '<strong<') from being injected into the DOM
-    while still allowing simple formatting from the model.
+    Approach:
+    - Scan the original content and replace any full allowed HTML fragments (e.g. <strong>...</strong>, <li>...</li>,
+      or full <a href="...">...</a>) with placeholders.
+    - Escape the entire string (so any stray '<' or malformed tags are neutralized).
+    - Replace placeholders with the original allowed fragments (which were validated before placeholdering).
+
+    This guarantees that only full, well-formed allowed fragments are rendered as HTML; everything else is escaped.
     """
     if not content:
         return ""
-    # Fully escape first
-    escaped = _html.escape(content)
-    # Allow simple tags
+
     allow_tags = ["strong", "em", "ul", "li", "p", "br", "b", "i"]
+    placeholders = {}
+    placeholder_counter = 0
+
+    s = content
+
+    # 1) extract full <a href="...">...</a> fragments first
+    for m in _re.finditer(r'<a\s+href="([^"]+)">(.*?)</a>', s, flags=_re.IGNORECASE | _re.DOTALL):
+        href = m.group(1)
+        inner = m.group(2)
+        # Basic validation of href
+        if href.startswith(("http://", "https://", "mailto:", "data:")):
+            ph = f"__ALLOWED_HTML_{placeholder_counter}__"
+            placeholders[ph] = f'<a href="{href}" target="_blank" rel="noopener">{_html.escape(inner)}</a>'
+            s = s.replace(m.group(0), ph)
+            placeholder_counter += 1
+
+    # 2) extract full allowed tags like <strong>...</strong> and <li>...</li>
     for tag in allow_tags:
-        escaped = escaped.replace(f"&lt;{tag}&gt;", f"<{tag}>")
-        escaped = escaped.replace(f"&lt;/{tag}&gt;", f"</{tag}>")
-        # self-closing br
-        escaped = escaped.replace(f"&lt;{tag}/&gt;", f"<{tag}/> ")
+        pattern = rf'<{tag}>(.*?)</{tag}>'
+        for m in _re.finditer(pattern, s, flags=_re.IGNORECASE | _re.DOTALL):
+            inner = m.group(1)
+            ph = f"__ALLOWED_HTML_{placeholder_counter}__"
+            placeholders[ph] = f'<{tag}>{_html.escape(inner)}</{tag}>'
+            s = s.replace(m.group(0), ph)
+            placeholder_counter += 1
 
-    # Allow simple <a href="..."> links (keep only href attribute)
-    def _unescape_a(match):
-        href = match.group(1)
-        # Basic safety: only allow http, https, mailto, or data URIs
-        if href.startswith("http://") or href.startswith("https://") or href.startswith("mailto:") or href.startswith("data:"):
-            return f'<a href="{href}" target="_blank" rel="noopener">'
-        return "&lt;a&gt;"
+    # 3) extract self-closing <br/> occurrences
+    for m in _re.finditer(r'<br\s*/?>', s, flags=_re.IGNORECASE):
+        ph = f"__ALLOWED_HTML_{placeholder_counter}__"
+        placeholders[ph] = '<br/>'
+        s = s.replace(m.group(0), ph)
+        placeholder_counter += 1
 
-    escaped = _re.sub(r'&lt;a href=&quot;(.*?)&quot;&gt;', _unescape_a, escaped)
-    escaped = escaped.replace("&lt;/a&gt;", "</a>")
+    # 4) escape everything
+    escaped = _html.escape(s)
+
+    # 5) restore placeholders with their safe HTML
+    for ph, html_fragment in placeholders.items():
+        escaped = escaped.replace(_html.escape(ph), html_fragment)
 
     return escaped
 
