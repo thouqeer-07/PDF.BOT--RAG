@@ -1,6 +1,8 @@
 # ==== ui.py ====
 
 import streamlit as st
+import html as _html
+import re as _re
 import time
 import base64
 from pymongo import MongoClient
@@ -9,6 +11,38 @@ from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_fr
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
 chats_col = db["users"]
+
+
+def sanitize_html(content: str) -> str:
+    """Escape everything then unescape a small allowlist of safe tags.
+
+    This prevents malformed tags (like '<strong<') from being injected into the DOM
+    while still allowing simple formatting from the model.
+    """
+    if not content:
+        return ""
+    # Fully escape first
+    escaped = _html.escape(content)
+    # Allow simple tags
+    allow_tags = ["strong", "em", "ul", "li", "p", "br", "b", "i"]
+    for tag in allow_tags:
+        escaped = escaped.replace(f"&lt;{tag}&gt;", f"<{tag}>")
+        escaped = escaped.replace(f"&lt;/{tag}&gt;", f"</{tag}>")
+        # self-closing br
+        escaped = escaped.replace(f"&lt;{tag}/&gt;", f"<{tag}/> ")
+
+    # Allow simple <a href="..."> links (keep only href attribute)
+    def _unescape_a(match):
+        href = match.group(1)
+        # Basic safety: only allow http, https, mailto, or data URIs
+        if href.startswith("http://") or href.startswith("https://") or href.startswith("mailto:") or href.startswith("data:"):
+            return f'<a href="{href}" target="_blank" rel="noopener">'
+        return "&lt;a&gt;"
+
+    escaped = _re.sub(r'&lt;a href=&quot;(.*?)&quot;&gt;', _unescape_a, escaped)
+    escaped = escaped.replace("&lt;/a&gt;", "</a>")
+
+    return escaped
 
 
 
@@ -589,6 +623,8 @@ def render_chat():
 
         # Bot response
         bot_content = chat['bot']
+        # sanitize later before rendering; initialize sanitized value
+        safe_bot = sanitize_html(bot_content)
         download_commands = [
             "⬇️ download pdf",
             "download pdf",
@@ -617,13 +653,16 @@ def render_chat():
             else:
                 bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> is not available for download."
 
+            # Re-sanitize after bot_content may have changed
+            safe_bot = sanitize_html(bot_content)
+
             st.markdown(
                 f"""
                 <div class='chat-row bot-row'>
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
                         <img src=\"data:image/png;base64,{bot_icon_base64}\" style=\"width:32px; height:32px;\" />
                     </div>
-                    <div class='chat-bubble bot-msg'>{bot_content}</div>
+                    <div class='chat-bubble bot-msg'>{safe_bot}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -632,7 +671,7 @@ def render_chat():
         elif i == len(chats) - 1 and not chat.get("animated", False):
             # Show 'Bot is thinking...' interface before typewriter effect
             thinking_container = st.empty()
-            thinking_container.markdown(
+            st.markdown(
                 f"""
                 <div class='chat-row bot-row'>
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
@@ -645,7 +684,8 @@ def render_chat():
             )
             time.sleep(0.7)  # Simulate thinking delay
             thinking_container.empty()
-            final_text = typewriter(bot_content)
+            # Use sanitized content for the typewriter display
+            final_text = typewriter(safe_bot)
             chat['bot'] = final_text
             chat['animated'] = True
         else:
@@ -655,7 +695,7 @@ def render_chat():
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
                         <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
                     </div>
-                    <div class='chat-bubble bot-msg'>{bot_content}</div>
+                    <div class='chat-bubble bot-msg'>{sanitize_html(bot_content)}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
