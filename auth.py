@@ -220,9 +220,9 @@ def require_login():
                 if st.button("🚪 Logout"):
                     save_user_chats()
                     st.session_state.clear()
-                    st.success("You have been logged out.")
+                    
                     st.rerun()
-
+                st.toast("You have been logged out.", icon="✅")
 
                 # --- Delete Account Section ---
                 if "confirm_delete" not in st.session_state:
