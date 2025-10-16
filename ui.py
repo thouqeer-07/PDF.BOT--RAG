@@ -3,8 +3,6 @@
 import streamlit as st
 import time
 import base64
-import html as _html
-import re
 from pymongo import MongoClient
 from config import MONGO_URI
 from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_from_drive
@@ -67,55 +65,6 @@ def img_to_base64(path):
     return base64.b64encode(data).decode()
 
 bot_icon_base64 = img_to_base64("assets/BOTI.png")
-
-
-def sanitize_html(text: str) -> str:
-    """Sanitize LLM-generated HTML while allowing a small whitelist of tags.
-
-    Strategy:
-    - Escape the full text, then selectively unescape only allowed tags.
-    - Allow <strong>, <em>, <p>, <br>, <ul>, <li>, and <a href="..."> with http/data/mailto schemes.
-    - Any other angle brackets are kept escaped to avoid createElement errors.
-    """
-    if text is None:
-        return ""
-    # Fully escape first to neutralize any tags
-    escaped = _html.escape(text)
-
-    # Helper list of allowed simple tags
-    allowed_simple = ["strong", "em", "p", "br", "ul", "li"]
-    for tag in allowed_simple:
-        # unescape opening and closing tags; handle self-closing br
-        escaped = re.sub(rf'&lt;{tag}&gt;', f'<{tag}>', escaped, flags=re.IGNORECASE)
-        escaped = re.sub(rf'&lt;/{tag}&gt;', f'</{tag}>', escaped, flags=re.IGNORECASE)
-        if tag == 'br':
-            escaped = re.sub(rf'&lt;{tag}\s*/&gt;', f'<{tag}/>', escaped, flags=re.IGNORECASE)
-
-    # Unescape <a href='...'> and </a> but only for safe href schemes
-    def _restore_a(match):
-        href = match.group(1)
-        text_inside = match.group(2)
-        # Only allow safe schemes
-        if href.startswith('http://') or href.startswith('https://') or href.startswith('data:') or href.startswith('mailto:'):
-            href_unq = href.replace('&quot;', '"').replace('&#x27;', "'")
-            return f'<a href="{href_unq}">{text_inside}</a>'
-        # otherwise return escaped representation (keep it safe)
-        return f'&lt;a href=&quot;{href}&quot;&gt;{text_inside}&lt;/a&gt;'
-
-    # Pattern: &lt;a href=&quot;...&quot;&gt;...&lt;/a&gt;
-    escaped = re.sub(r'&lt;a href=(?:&quot;|&#x27;)(.*?)(?:&quot;|&#x27;)&gt;(.*?)&lt;/a&gt;', _restore_a, escaped, flags=re.IGNORECASE | re.DOTALL)
-
-    # Ensure any remaining literal < or > are escaped
-    escaped = escaped.replace('<', '&lt;').replace('>', '&gt;')
-
-    # Restore allowed simple tags back from escaped form
-    for tag in allowed_simple:
-        escaped = escaped.replace(f'&lt;{tag}&gt;', f'<{tag}>')
-        escaped = escaped.replace(f'&lt;/{tag}&gt;', f'</{tag}>')
-        if tag == 'br':
-            escaped = escaped.replace(f'&lt;{tag}/&gt;', f'<{tag}/>')
-
-    return escaped
 
 def render_main_ui(send_message):
     # Chat input styling
@@ -534,45 +483,22 @@ def render_sidebar():
 
 
 def typewriter(text, delay=0.005):
-    """Simulates typing effect with bot icon.
-
-    If the text contains HTML, sanitize and render the entire HTML atomically to avoid partial-tag DOM errors.
-    For plain text, display with a typing effect (escaped to avoid accidental tags).
-    """
+    """Simulates typing effect with bot icon."""
     container = st.empty()
-    # If text contains HTML-like characters, treat as HTML and render sanitized HTML atomically
-    if "<" in (text or "") and ">" in (text or ""):
-        sanitized = sanitize_html(text)
-        container.markdown(
-            f"""
-            <div class='chat-row bot-row'>
-                <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center;'>
-                <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
-                </div>
-                <div class='chat-bubble bot-msg'>{sanitized}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        # Return plain text fallback (tags removed) for storage in chat['bot']
-        return _html.unescape(re.sub(r'<[^>]+>', '', sanitized))
-
-    # Plain text path with typing effect (escape to avoid any accidental tags)
     displayed_text = ""
     fast_delay = 0.001  # much faster typing
     for char in text:
         displayed_text += char
-        safe = _html.escape(displayed_text)
         container.markdown(
             f"""
             <div class='chat-row bot-row'>
                 <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center;'>
                 <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
                 </div>
-                <div class='chat-bubble bot-msg'>{safe}</div>
+                <div class='chat-bubble bot-msg'>{displayed_text}</div>
             </div>
             """,
-            unsafe_allow_html=True,
+            unsafe_allow_html=True
         )
         time.sleep(fast_delay)
     return displayed_text
