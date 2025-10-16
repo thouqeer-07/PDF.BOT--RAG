@@ -648,9 +648,13 @@ def render_chat():
         )
 
         # Bot response
-        bot_content = chat['bot']
-        # sanitize later before rendering; initialize sanitized value
-        safe_bot = sanitize_html(bot_content)
+        bot_raw = chat.get('bot', "")  # original model text
+        bot_html = chat.get('bot_html')  # sanitized HTML stored after rendering
+        # Compute one safe HTML string to render: prefer cached bot_html
+        if bot_html:
+            safe_bot = bot_html
+        else:
+            safe_bot = sanitize_html(bot_raw)
         download_commands = [
             "⬇️ download pdf",
             "download pdf",
@@ -710,9 +714,10 @@ def render_chat():
             )
             time.sleep(0.7)  # Simulate thinking delay
             thinking_container.empty()
-            # Use sanitized content for the typewriter display
-            final_text = typewriter(safe_bot)
-            chat['bot'] = final_text
+            # Use sanitized content for the typewriter display (this writes directly to the page)
+            _ = typewriter(safe_bot)
+            # Cache sanitized HTML so future renders don't re-sanitize or double-escape
+            chat['bot_html'] = safe_bot
             chat['animated'] = True
         else:
             st.markdown(
@@ -721,7 +726,7 @@ def render_chat():
                     <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
                         <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
                     </div>
-                    <div class='chat-bubble bot-msg'>{sanitize_html(bot_content)}</div>
+                    <div class='chat-bubble bot-msg'>{safe_bot}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
