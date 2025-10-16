@@ -209,6 +209,12 @@ def setup_ui():
 
 def render_sidebar():
     username = st.session_state.get("username", "guest")
+    # Ensure MongoDB collection handle is always available
+    from pymongo import MongoClient
+    from config import MONGO_URI
+    client = MongoClient(MONGO_URI)
+    db = client["pdfbot"]
+    chats_col = db["users"]
     creds_ok = False
     drive_service = None
     # Check for Google Drive credentials
