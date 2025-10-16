@@ -66,7 +66,7 @@ def login_interface():
         st.markdown("""
          <style>
          div[data-testid="stTextInput"] > div > input {
-         width: 300px;  /* Set your fixed width here */
+         width: 300px !important;  /* Set your fixed width here */
          }
          </style>
          """, unsafe_allow_html=True)
