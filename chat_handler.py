@@ -23,7 +23,20 @@ def send_message():
     elif any(thank in user_input.lower() for thank in thanks):
         bot_reply = "You're welcome! 😊"
     else:
-        docs = retriever.invoke(user_input) if retriever else []
+        # Heuristic: detect MCQ-type questions (presence of options like A), B), or 'choose' + options)
+        is_mcq = False
+        lowered = user_input.lower()
+        if any(tok in lowered for tok in [" a)", " b)", " c)", " d)", "a.", "b.", "choose", "which option", "which of the following"]):
+            is_mcq = True
+
+        # Increase retrieval size for MCQ to get more context
+        docs = []
+        if retriever:
+            if is_mcq:
+                docs = retriever.search(query=user_input, search_type="similarity", k=8)
+            else:
+                docs = retriever.invoke(user_input)
+
         print(f"[DEBUG] Retrieved docs: {len(docs)}")
         for i, d in enumerate(docs):
             print(f"[DEBUG] Doc {i}: {getattr(d, 'page_content', str(d))[:200]}")
@@ -34,7 +47,12 @@ def send_message():
             print(f"[DEBUG] Context sent to LLM: {context[:500]}")
             genai.configure(api_key=GOOGLE_API_KEY)
             model = genai.GenerativeModel("gemini-2.0-flash")
-            prompt = get_prompt().format(context=context, question=user_input)
+            if is_mcq:
+                from prompts import get_mcq_prompt
+                prompt = get_mcq_prompt().format(context=context, question=user_input)
+            else:
+                from prompts import get_prompt
+                prompt = get_prompt().format(context=context, question=user_input)
             print(f"[DEBUG] Prompt sent to LLM: {prompt}")
             response = model.generate_content(prompt)
             print(f"[DEBUG] LLM response: {response.text.strip()}")
