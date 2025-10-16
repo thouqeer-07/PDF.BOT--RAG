@@ -519,6 +519,23 @@ def render_sidebar():
 def typewriter(text, delay=0.005):
     """Simulates typing effect with bot icon."""
     container = st.empty()
+    # If text contains HTML-like characters, avoid incremental rendering to prevent DOM parse errors
+    if "<" in text or ">" in text:
+        # render full sanitized HTML immediately
+        safe = sanitize_html(text)
+        container.markdown(
+            f"""
+            <div class='chat-row bot-row'>
+                <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center;'>
+                <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
+                </div>
+                <div class='chat-bubble bot-msg'>{safe}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return safe
+
     displayed_text = ""
     fast_delay = 0.001  # much faster typing
     for char in text:
@@ -529,12 +546,13 @@ def typewriter(text, delay=0.005):
                 <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center;'>
                 <img src="data:image/png;base64,{bot_icon_base64}" style="width:32px; height:32px;" />
                 </div>
-                <div class='chat-bubble bot-msg'>{displayed_text}</div>
+                <div class='chat-bubble bot-msg'>{_html.escape(displayed_text)}</div>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
         time.sleep(fast_delay)
+    # Return fully escaped/plain text (no tags expected here)
     return displayed_text
 
 
