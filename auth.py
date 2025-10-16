@@ -10,7 +10,7 @@ from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 
 st.set_page_config(
-        page_title="RAG Chatbot",
+        page_title="PDF Chatbot",
         page_icon="assets/LOGO.png",  
         layout="wide"
     )

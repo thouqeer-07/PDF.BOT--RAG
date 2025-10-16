@@ -188,7 +188,7 @@ def show_main_chat_input(send_message, selected_pdf):
 
 def setup_ui():
     st.set_page_config(
-        page_title="RAG Chatbot",
+        page_title="PDF Chatbot",
         page_icon="assets/MYLOGO.png",  
         layout="wide"
     )
@@ -378,7 +378,7 @@ def render_sidebar():
                      if col.startswith(f"{username}__{pdf_name}")),
                     None
                 )
-                col1, col2 = st.columns([4, 1])
+                col1, col2 = st.columns([4, 2])
                 with col1:
                     if st.session_state.get("selected_pdf") == pdf_name:
                         st.markdown(f"**{pdf_name}** ✅")
@@ -404,7 +404,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("Delete", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
+                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
 
