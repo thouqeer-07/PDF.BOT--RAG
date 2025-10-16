@@ -27,7 +27,7 @@ def img_to_base64(path):
         data = f.read()
     return base64.b64encode(data).decode()
 log_icon_base64 = img_to_base64("assets/LOGIN.png")
-welcome = img_to_base64("assets/MYLOGO.png")
+welcome_icon_base64= img_to_base64("assets/MYLOGO.png")
 # --- MongoDB user DB helper functions ---
 def get_user_by_username_or_email(identifier):
     return users_col.find_one({"$or": [{"username": identifier}, {"email": identifier}]})
@@ -51,9 +51,9 @@ def delete_user(username):
 def login_interface():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown("""
+        st.markdown(f"""
           <h3 style='text-align: center;'>
-          <img src="data:image/png;base64,{welcome}" width='30' style='vertical-align: middle; margin-right: 10px;'>
+          <img src='data:image/png;base64,{welcome_icon_base64}' width='30' style='vertical-align: middle; margin-right: 10px;'>
           Welcome To PDF Chat Bot!
           </h3>
           """, unsafe_allow_html=True)
