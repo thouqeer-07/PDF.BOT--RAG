@@ -12,15 +12,21 @@ def send_message():
     if not user_input:
         return
 
+    import re
+
+    # Use tokenized/word-boundary matching to avoid false positives (e.g., 'which' contains 'hi')
     greetings = {"hi", "hello", "hey", "hii"}
     farewells = {"bye", "goodbye", "exit", "quit"}
     thanks = {"thanks", "thank you", "thx", "tnx"}
 
-    if any(greet in user_input.lower() for greet in greetings):
+    tokens = set(re.findall(r"\b\w+\b", user_input.lower()))
+
+    if tokens & greetings:
         bot_reply = "Hello! 👋 How can I help you today?"
-    elif any(farewell in user_input.lower() for farewell in farewells):
+    elif tokens & farewells:
         bot_reply = "Goodbye! 👋 Have a great day!"
-    elif any(thank in user_input.lower() for thank in thanks):
+    elif any(phrase in user_input.lower() for phrase in thanks):
+        # 'thank you' is multi-word; keep phrase check for thanks
         bot_reply = "You're welcome! 😊"
     else:
         # Heuristic: detect MCQ-type questions (presence of options like A), B), or 'choose' + options)
