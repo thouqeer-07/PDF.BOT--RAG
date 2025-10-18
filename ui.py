@@ -1,14 +1,14 @@
 # ==== ui.py ====
 
 import streamlit as st
-import time
-import base64
-from pymongo import MongoClient
 st.set_page_config(
         page_title="PDF Chatbot",
         page_icon="assets/LOGO.png",  
         layout="wide"
     )
+import time
+import base64
+from pymongo import MongoClient
 from config import MONGO_URI
 from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_from_drive
 client = MongoClient(MONGO_URI)
