@@ -1,11 +1,6 @@
 #===== auth.py ====
 
 import streamlit as st
-st.set_page_config(
-        page_title="PDF Chatbot",
-        page_icon="assets/LOGO.png",  
-        layout="wide"
-    )
 import os  # Only for non-file ops
 import base64
 from pymongo import MongoClient
