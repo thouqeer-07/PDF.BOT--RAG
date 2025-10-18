@@ -108,6 +108,8 @@ def send_message():
             response = model.generate_content(prompt)
             print(f"[DEBUG] LLM response: {response.text.strip()}")
             bot_reply = response.text.strip()
+            st.markdown(response.text, unsafe_allow_html=True)
+
 
     selected_pdf = st.session_state.get("selected_pdf")
     if selected_pdf not in st.session_state.pdf_chats:

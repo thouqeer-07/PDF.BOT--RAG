@@ -25,7 +25,7 @@ QA_TEMPLATE = """
 ---
 
 ### 🧭 Instructions:
-- Write in bold and a clear and neatly formatted answer (2–5 sentences).
+- Write a **clear and neatly formatted answer** (2–5 sentences).
 - Use bullet points if it improves readability.
 - **Cite the source** (page number or filename) if available.
 - If the answer is missing or unclear, respond politely that it’s not available in the PDF.
