@@ -6,7 +6,9 @@ SYSTEM_PROMPT = (
     "Avoid unnecessary symbols or raw formatting characters.\n"
     "If the answer is partially available, use what is known and note what is missing.\n"
     "If unsure, briefly explain why. If the answer is not in the context, say:\n"
+    "Use additional emojis to enhance clarity and professionalism in your response.\n"
     '"I don’t know based on the provided PDF."'
+
 )
 
 QA_TEMPLATE = """
@@ -25,7 +27,7 @@ QA_TEMPLATE = """
 ---
 
 ### 🧭 Instructions:
-- Write a **clear and neatly formatted answer** (2–5 sentences).
+- Write a clear and neatly formatted answer (2–5 sentences).
 - Use bullet points if it improves readability.
 - **Cite the source** (page number or filename) if available.
 - If the answer is missing or unclear, respond politely that it’s not available in the PDF.
@@ -54,8 +56,8 @@ MCQ_TEMPLATE = """
 - Respond **only** in the following clean format:
 
 Answer: <Letter>  
-**Explanation:** <1–2 line reasoning>  
-**Source:** <Page number or filename, if available>
+Explanation: <1–2 line reasoning>  
+Source: <Page number or filename, if available>
 
 - Keep your output professional and well-spaced.
 - Do not repeat the question or options.
