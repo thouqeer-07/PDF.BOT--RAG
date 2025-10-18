@@ -9,6 +9,7 @@ SYSTEM_PROMPT = (
     "Use additional emojis to enhance clarity and professionalism in your response.\n"
     "Bold important points to highlight them.\n"
     "Use more design\n"
+    "Use atleast 2-3 emojis in every response to make it engaging and user-friendly.\n"
     "Code explanations should be in fenced code blocks.\n"
     "Highlight key information using bullet points or numbered lists where appropriate.\n"
     "Coding or technical explanations should be in fenced code blocks.\n"
