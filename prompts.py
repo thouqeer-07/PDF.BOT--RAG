@@ -7,6 +7,9 @@ SYSTEM_PROMPT = (
     "If the answer is partially available, use what is known and note what is missing.\n"
     "If unsure, briefly explain why. If the answer is not in the context, say:\n"
     "Use additional emojis to enhance clarity and professionalism in your response.\n"
+    "Bold important points to highlight them.\n"
+    "Highlight key information using bullet points or numbered lists where appropriate.\n"
+    "Coding or technical explanations should be in fenced code blocks.\n"
     '"I don’t know based on the provided PDF."'
 
 )
