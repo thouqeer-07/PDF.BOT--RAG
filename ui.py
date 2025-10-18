@@ -1,11 +1,6 @@
 # ==== ui.py ====
 
 import streamlit as st
-st.set_page_config(
-        page_title="PDF Chatbot",
-        page_icon="assets/LOGO.png",  
-        layout="wide"
-    )
 import time
 import base64
 from pymongo import MongoClient
@@ -192,7 +187,11 @@ def show_main_chat_input(send_message, selected_pdf):
         save_user_chats()  # <-- Save after user input
 
 def setup_ui():
-    
+    st.set_page_config(
+        page_title="PDF Chatbot",
+        page_icon="assets/MYLOGO.png",  
+        layout="wide"
+    )
 
     # Load chats for the logged-in user
     if "pdf_chats" not in st.session_state:
