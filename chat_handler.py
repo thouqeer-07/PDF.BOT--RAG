@@ -18,11 +18,14 @@ def send_message():
     greetings = {"hi", "hello", "hey", "hii"}
     farewells = {"bye", "goodbye", "exit", "quit"}
     thanks = {"thanks", "thank you", "thx", "tnx"}
+    creator = {"who created you", "who is your creator", "who made you", "who developed you"}
 
     tokens = set(re.findall(r"\b\w+\b", user_input.lower()))
 
     if tokens & greetings:
         bot_reply = "Hello! 👋 How can I help you today?"
+    elif tokens & creator:
+        bot_reply = "Created and managed by Mr. Syed Thouqeer Ahmed A.🤖✨"
     elif tokens & farewells:
         bot_reply = "Goodbye! 👋 Have a great day!"
     elif any(phrase in user_input.lower() for phrase in thanks):
