@@ -3,6 +3,8 @@
 import streamlit as st
 import time
 import base64
+import html as _html
+import re
 from pymongo import MongoClient
 from config import MONGO_URI
 from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_from_drive
@@ -65,6 +67,33 @@ def img_to_base64(path):
     return base64.b64encode(data).decode()
 
 bot_icon_base64 = img_to_base64("assets/BOTI.png")
+
+
+def render_bot_content(raw: str) -> str:
+    """Convert simple Markdown bold/italic to HTML and escape the rest.
+
+    - Convert **bold** -> <strong>...</strong>
+    - Convert *italic* or _italic_ -> <em>...</em>
+    - Leave other content escaped to avoid injection.
+    """
+    if raw is None:
+        return ""
+    # Escape everything first
+    safe = _html.escape(raw)
+    # Convert escaped bold (**text**)
+    safe = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', safe)
+    # Convert escaped italic (*text* or _text_)
+    safe = re.sub(r'(?<!\*)\*(?!\*)(.*?)\*(?<!\*)', r'<em>\1</em>', safe)
+    safe = re.sub(r'_(.*?)_', r'<em>\1</em>', safe)
+    # Allow simple links of form [text](url) -> <a href="url">text</a> for http(s)/mailto/data
+    def _link_repl(m):
+        text = m.group(1)
+        url = m.group(2)
+        if url.startswith('http://') or url.startswith('https://') or url.startswith('mailto:') or url.startswith('data:'):
+            return f'<a href="{url}">{text}</a>'
+        return m.group(0)
+    safe = re.sub(r'\[(.*?)\]\((.*?)\)', _link_repl, safe)
+    return safe
 
 def render_main_ui(send_message):
     # Chat input styling
