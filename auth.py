@@ -1,6 +1,11 @@
 #===== auth.py ====
 
 import streamlit as st
+st.set_page_config(
+        page_title="PDF Chatbot",
+        page_icon="assets/LOGO.png",  
+        layout="wide"
+    )
 import os  # Only for non-file ops
 import base64
 from pymongo import MongoClient
@@ -9,11 +14,7 @@ from qdrant_client import QdrantClient
 from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
 from gdrive_utils import get_drive_service, download_pdf_from_drive
 
-st.set_page_config(
-        page_title="PDF Chatbot",
-        page_icon="assets/LOGO.png",  
-        layout="wide"
-    )
+
 # --- MongoDB Setup ---
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
