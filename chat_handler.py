@@ -25,7 +25,7 @@ def send_message():
     if tokens & greetings:
         bot_reply = "Hello! 👋 How can I help you today?"
     elif any(phrase in user_input.lower() for phrase in creator):
-        bot_reply = "Created and managed by Mr. Syed Thouqeer Ahmed A.🤖✨"
+        bot_reply = "Created and managed by Mr. Syed Thouqeer Ahmed A.✨"
     elif tokens & farewells:
         bot_reply = "Goodbye! 👋 Have a great day!"
     elif any(phrase in user_input.lower() for phrase in thanks):
