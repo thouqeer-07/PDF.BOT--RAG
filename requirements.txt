@@ -1,4 +1,4 @@
-streamlit==1.39.0
+streamlit
 pymongo==4.9.1
 qdrant-client==1.11.1
 langchain
