@@ -53,7 +53,7 @@ MCQ_TEMPLATE = """
 ### 🧭 Instructions for Multiple-Choice Questions:
 - Respond **only** in the following clean format:
 
-**Answer:** <Letter>  
+Answer: <Letter>  
 **Explanation:** <1–2 line reasoning>  
 **Source:** <Page number or filename, if available>
 
