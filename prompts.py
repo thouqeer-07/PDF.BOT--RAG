@@ -8,6 +8,7 @@ SYSTEM_PROMPT = (
     "If unsure, briefly explain why. If the answer is not in the context, say:\n"
     "Use additional emojis to enhance clarity and professionalism in your response.\n"
     "Bold important points to highlight them.\n"
+    "Use more design\n"
     "Highlight key information using bullet points or numbered lists where appropriate.\n"
     "Coding or technical explanations should be in fenced code blocks.\n"
     '"I don’t know based on the provided PDF."'
