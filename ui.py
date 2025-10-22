@@ -5,7 +5,7 @@ import time
 import base64
 from pymongo import MongoClient
 from config import MONGO_URI
-from gdrive_utils import get_drive_service, upload_pdf_to_drive, download_pdf_from_drive
+# Local-only PDF handling: no Google Drive / OAuth required
 client = MongoClient(MONGO_URI)
 db = client["pdfbot"]
 chats_col = db["users"]
@@ -215,160 +215,155 @@ def render_sidebar():
     client = MongoClient(MONGO_URI)
     db = client["pdfbot"]
     chats_col = db["users"]
-    creds_ok = False
-    drive_service = None
-    # Check for Google Drive credentials
-    if "google_creds" in st.session_state:
-        creds_ok = True
-    else:
-        # Try to load from MongoDB
-        from pymongo import MongoClient
-        from config import MONGO_URI
-        client = MongoClient(MONGO_URI)
-        db = client["pdfbot"]
-        chats_col = db["users"]
-        user_data = chats_col.find_one({"username": username})
-        if user_data and user_data.get("google_creds"):
-            st.session_state["google_creds"] = user_data["google_creds"]
-            creds_ok = True
-    if creds_ok:
-        try:
-            drive_service = get_drive_service()
-        except Exception as e:
-            st.error(f"Google Drive authentication failed: {e}. Please reconnect.")
-            creds_ok = False
-
     with st.sidebar:
-        st.markdown("### 📄 Upload a PDF")
-        if not creds_ok:
-            st.warning("Google Drive not connected. Please connect to upload/download files.")
-            # Show only the Connect to Google Drive link
-            import json
-            from google_auth_oauthlib.flow import Flow
-            from config import REDIRECT_URI, SCOPES
-            client_config = json.loads(st.secrets["GOOGLE_CLIENT_SECRET_FILE"])
-            flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=REDIRECT_URI)
-            auth_url, _ = flow.authorization_url(prompt="consent", state=username)
-            st.markdown(f"### 🔗 [Connect to Google Drive]({auth_url})")
-        else:
-            uploaded_pdf = st.file_uploader("Choose a PDF file", type=["pdf"], key="pdf_uploader")
-            upload_clicked = st.button("Upload", key="upload_pdf_button")
-            if uploaded_pdf and upload_clicked:
-                pdf_name = uploaded_pdf.name
-                pdf_bytes = uploaded_pdf.read()
-                # Upload to Google Drive in user's folder (will reuse if exists)
-                drive_result = upload_pdf_to_drive(drive_service, pdf_name, pdf_bytes, username=username)
-                file_id = drive_result["id"]
-                webViewLink = drive_result["webViewLink"]
+        st.markdown("### 📄 Upload a PDF (local only)")
+        uploaded_pdf = st.file_uploader("Choose a PDF file to upload", type=["pdf"], key="pdf_uploader")
+        upload_clicked = st.button("Upload", key="upload_pdf_button")
+        if uploaded_pdf and upload_clicked:
+            pdf_name = uploaded_pdf.name
+            pdf_bytes = uploaded_pdf.read()
 
-                user_collection_name = f"{username}__{pdf_name}"
-                # Check if this PDF already exists in user_collections
-                if user_collection_name in st.session_state.get('user_collections', []):
-                    # Reuse existing chat interface and collection
-                    st.session_state.selected_pdf = pdf_name
-                    st.session_state.current_collection = user_collection_name
-        
-                    st.success(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
-                    st.rerun()
-                else:
-                    # Store file_id in pdf_history and user_collections
-                    if 'pdf_history' not in st.session_state:
-                        st.session_state['pdf_history'] = []
-                    st.session_state['pdf_history'].append({
-                        "name": pdf_name,
-                        "file_id": file_id,
-                        "webViewLink": webViewLink,
-                        "collection": user_collection_name
-                    })
-                    if 'user_collections' not in st.session_state:
-                        st.session_state['user_collections'] = []
-                    if user_collection_name not in st.session_state['user_collections']:
-                        st.session_state['user_collections'].append(user_collection_name)
-
-                    # Build embeddings/index for this user's collection using in-memory bytes
-                    from embeddings_utils import build_or_load_index
-                    import tempfile
-                    import os
-                    # Only build embeddings if not already present for this collection
-                    if (
-                        "vectordb" not in st.session_state
-                        or st.session_state.vectordb is None
-                        or st.session_state.PDF_NAME != user_collection_name
-                    ):
-                        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                            tmp.write(pdf_bytes)
-                            tmp.flush()
-                            temp_pdf_path = tmp.name
-                        try:
-                            vectordb = build_or_load_index(collection_name=user_collection_name, pdf_path=temp_pdf_path)
-                            if vectordb is None:
-                                st.error("Failed to build or load PDF index. Please check your PDF and try again.")
-                                return
-                            st.session_state.vectordb = vectordb
-                            st.session_state.retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-                            st.session_state.PDF_NAME = user_collection_name
-                        finally:
-                            try:
-                                os.remove(temp_pdf_path)
-                            except Exception as e:
-                                print(f"[WARNING] Could not delete temp PDF file: {e}")
-
-                    st.session_state.selected_pdf = pdf_name
-                    st.session_state.current_collection = user_collection_name
-                    if 'pdf_chats' not in st.session_state:
-                        st.session_state['pdf_chats'] = {}
-                    st.session_state.pdf_chats[pdf_name] = []
-                    save_user_chats()
-                    st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
-                if 'pdf_history' not in st.session_state:
-                    st.session_state['pdf_history'] = []
-                st.session_state['pdf_history'].append({
-                    "name": pdf_name,
-                    "file_id": file_id,
-                    "webViewLink": webViewLink,
-                    "collection": user_collection_name
-                })
-                if 'user_collections' not in st.session_state:
-                    st.session_state['user_collections'] = []
-                if user_collection_name not in st.session_state['user_collections']:
-                    st.session_state['user_collections'].append(user_collection_name)
-
-                # Build embeddings/index for this user's collection using in-memory bytes
-                from embeddings_utils import build_or_load_index
-                import tempfile
-                import os
-                # Only build embeddings if not already present for this collection
-                if (
-                    "vectordb" not in st.session_state
-                    or st.session_state.vectordb is None
-                    or st.session_state.PDF_NAME != user_collection_name
-                ):
-                    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                        tmp.write(pdf_bytes)
-                        tmp.flush()
-                        temp_pdf_path = tmp.name
-                    try:
-                        vectordb = build_or_load_index(collection_name=user_collection_name, pdf_path=temp_pdf_path)
-                        if vectordb is None:
-                            st.error("Failed to build or load PDF index. Please check your PDF and try again.")
-                            return
-                        st.session_state.vectordb = vectordb
-                        st.session_state.retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-                        st.session_state.PDF_NAME = user_collection_name
-                    finally:
-                        try:
-                            os.remove(temp_pdf_path)
-                        except Exception as e:
-                            print(f"[WARNING] Could not delete temp PDF file: {e}")
-
+            user_collection_name = f"{username}__{pdf_name}"
+            # Check if this PDF already exists in user_collections
+            if user_collection_name in st.session_state.get('user_collections', []):
                 st.session_state.selected_pdf = pdf_name
                 st.session_state.current_collection = user_collection_name
-                if 'pdf_chats' not in st.session_state:
-                    st.session_state['pdf_chats'] = {}
-                st.session_state.pdf_chats[pdf_name] = []
-                save_user_chats()
-                st.success(f"PDF '{pdf_name}' uploaded to Drive and indexed!", icon="✅")
+                st.success(f"PDF '{pdf_name}' already exists. Reusing previous chat and collection.", icon="✅")
+                st.rerun()
 
+            # Store pdf bytes and metadata in session (local-only)
+            if 'pdf_history' not in st.session_state:
+                st.session_state['pdf_history'] = []
+            st.session_state['pdf_history'].append({
+                "name": pdf_name,
+                "bytes": pdf_bytes,
+                "collection": user_collection_name
+            })
+            if 'user_collections' not in st.session_state:
+                st.session_state['user_collections'] = []
+            if user_collection_name not in st.session_state['user_collections']:
+                st.session_state['user_collections'].append(user_collection_name)
+
+            # Build embeddings/index for this user's collection using in-memory bytes
+            from embeddings_utils import build_or_load_index
+            if (
+                "vectordb" not in st.session_state
+                or st.session_state.vectordb is None
+                or st.session_state.PDF_NAME != user_collection_name
+            ):
+                vectordb = build_or_load_index(collection_name=user_collection_name, pdf_bytes=pdf_bytes)
+                if vectordb is None:
+                    st.error("Failed to build or load PDF index. Please check your PDF and try again.")
+                    return
+                st.session_state.vectordb = vectordb
+                st.session_state.retriever = vectordb.as_retriever(search_kwargs={"k": 4})
+                st.session_state.PDF_NAME = user_collection_name
+
+            st.session_state.selected_pdf = pdf_name
+            st.session_state.current_collection = user_collection_name
+            if 'pdf_chats' not in st.session_state:
+                st.session_state['pdf_chats'] = {}
+            st.session_state.pdf_chats[pdf_name] = []
+            save_user_chats()
+            st.success(f"PDF '{pdf_name}' uploaded and indexed locally!", icon="✅")
+
+        # --- Sidebar PDF list ---
+        pdf_names = [
+            col.split("__", 1)[1]
+            for col in st.session_state.get('user_collections', [])
+            if col.startswith(f"{username}__")
+        ]
+
+        if pdf_names:
+            st.markdown("### 📚 Your Uploaded PDFs (local)")
+            for i, pdf_name in enumerate(pdf_names):
+                user_collection_name = next(
+                    (col for col in st.session_state['user_collections']
+                     if col.startswith(f"{username}__{pdf_name}")),
+                    None
+                )
+                col1, col2 = st.columns([4, 2])
+                with col1:
+                    if st.session_state.get("selected_pdf") == pdf_name:
+                        st.markdown(f"**{pdf_name}** ✅")
+                    else:
+                        if st.button(pdf_name, key=f"select_{pdf_name}"):
+                            if user_collection_name:
+                                st.session_state.current_collection = user_collection_name
+                                from embeddings_utils import build_or_load_index
+                                st.session_state.vectordb = build_or_load_index(collection_name=user_collection_name)
+                                st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
+
+                            if 'pdf_chats' not in st.session_state:
+                                st.session_state['pdf_chats'] = {}
+                            if pdf_name not in st.session_state.pdf_chats:
+                                # try to restore from persisted MongoDB if available
+                                user_data = chats_col.find_one({"username": username})
+                                restored_chats = user_data.get("pdf_chats", {}).get(pdf_name, []) if user_data else []
+                                st.session_state.pdf_chats[pdf_name] = restored_chats if restored_chats is not None else []
+
+                            st.session_state.selected_pdf = pdf_name
+                            # Persist selection so reload preserves the correct chat mapping
+                            save_user_chats()
+                            st.rerun()
+
+                with col2:
+                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
+                        from qdrant_client import QdrantClient
+                        from config import QDRANT_URL, QDRANT_API_KEY
+
+                        # Delete Qdrant collection
+                        if user_collection_name:
+                            try:
+                                qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+                                collections = qdrant.get_collections().collections
+                                collection_names = [c.name for c in collections]
+                                if user_collection_name in collection_names:
+                                    qdrant.delete_collection(collection_name=user_collection_name)
+                                    import time as _time
+                                    for _ in range(5):
+                                        collections = qdrant.get_collections().collections
+                                        collection_names = [c.name for c in collections]
+                                        if user_collection_name not in collection_names:
+                                            break
+                                        _time.sleep(0.5)
+                            except Exception as e:
+                                print(f"[ERROR] Failed to delete Qdrant collection '{user_collection_name}': {e}")
+
+                        # Remove from user_collections
+                        if user_collection_name in st.session_state.get('user_collections', []):
+                            st.session_state['user_collections'].remove(user_collection_name)
+
+                        # Remove chat history for this PDF from session
+                        if pdf_name in st.session_state.get('pdf_chats', {}):
+                            del st.session_state['pdf_chats'][pdf_name]
+
+                        # Remove from pdf_history
+                        st.session_state['pdf_history'] = [
+                            pdf for pdf in st.session_state.get('pdf_history', [])
+                            if not (pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name)
+                        ]
+
+                        # Remove from MongoDB for this user
+                        user_data = chats_col.find_one({"username": username})
+                        if user_data:
+                            pdf_chats = user_data.get("pdf_chats", {})
+                            pdf_chats.pop(pdf_name, None)
+                            user_collections = user_data.get("user_collections", [])
+                            user_collections = [col for col in user_collections if col != user_collection_name]
+                            pdf_history = user_data.get("pdf_history", [])
+                            pdf_history = [pdf for pdf in pdf_history if not (pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name)]
+                            chats_col.update_one(
+                                {"username": username},
+                                {"$set": {"pdf_chats": pdf_chats, "user_collections": user_collections, "pdf_history": pdf_history}}
+                            )
+
+                        if st.session_state.get("selected_pdf") == pdf_name:
+                            st.session_state["selected_pdf"] = None
+                        st.success("🗑 PDF deleted!")
+                        st.rerun()
+        else:
+            st.info("No PDFs uploaded or indexed yet.")
         # --- Sidebar PDF list ---
         pdf_names = [
             col.split("__", 1)[1]
@@ -432,18 +427,16 @@ def render_sidebar():
                             except Exception as e:
                                 print(f"[ERROR] Failed to delete Qdrant collection '{user_collection_name}': {e}")
 
-                        # Delete PDF from Google Drive
-                        file_id = next(
-                            (pdf['file_id'] for pdf in st.session_state.get('pdf_history', [])
+                        # Local-only: remove any stored bytes for this PDF (no Drive delete)
+                        # file_bytes entries are stored under 'bytes' in pdf_history
+                        file_bytes_entry = next(
+                            (pdf for pdf in st.session_state.get('pdf_history', [])
                              if pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name),
                             None
                         )
-                        if file_id:
-                            try:
-                                from gdrive_utils import delete_pdf_from_drive
-                                delete_pdf_from_drive(drive_service, file_id, username=username)
-                            except Exception as e:
-                                print(f"[ERROR] Failed to delete PDF from Drive: {e}")
+                        if file_bytes_entry and 'bytes' in file_bytes_entry:
+                            # nothing external to delete; just log removal
+                            pass
 
                         # Remove from user_collections
                         if user_collection_name in st.session_state.get('user_collections', []):
@@ -568,13 +561,14 @@ def render_chat():
 
     st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
     chats = st.session_state.pdf_chats[selected_pdf]
-    # Find the Google Drive file ID for the selected PDF
+    # Find the local stored bytes for the selected PDF
     user_collection_name = st.session_state.get('current_collection')
-    file_id = None
+    file_bytes = None
     if user_collection_name:
-        file_id = next((pdf['file_id'] for pdf in st.session_state.get('pdf_history', [])
-                        if pdf['name'] == selected_pdf and pdf.get('collection') == user_collection_name), None)
-    drive_service = get_drive_service()
+        entry = next((pdf for pdf in st.session_state.get('pdf_history', [])
+                      if pdf['name'] == selected_pdf and pdf.get('collection') == user_collection_name), None)
+        if entry:
+            file_bytes = entry.get('bytes')
     for i, chat in enumerate(chats):
         # User message
         st.markdown(
@@ -605,15 +599,12 @@ def render_chat():
         ]
 
         if chat['user'].strip().lower() in download_commands:
-            if file_id:
-                from gdrive_utils import download_pdf_from_drive
-                username = st.session_state.get("username", "guest")
+            if file_bytes:
                 try:
-                    pdf_bytes = download_pdf_from_drive(drive_service, file_id, username=username)
-                    b64_pdf = base64.b64encode(pdf_bytes).decode()
+                    b64_pdf = base64.b64encode(file_bytes).decode()
                     bot_content = f"Here is your PDF: <a href='data:application/pdf;base64,{b64_pdf}' download='{selected_pdf}' style='text-decoration:none; font-weight:bold;'>⬇️ {selected_pdf}</a>"
                 except Exception as e:
-                    bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> could not be downloaded: {e}"
+                    bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> could not be prepared for download: {e}"
             else:
                 bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> is not available for download."
 

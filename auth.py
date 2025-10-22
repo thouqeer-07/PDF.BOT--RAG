@@ -7,7 +7,7 @@ from pymongo import MongoClient
 from ui import load_user_chats, save_user_chats
 from qdrant_client import QdrantClient
 from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
-from gdrive_utils import get_drive_service, download_pdf_from_drive
+# Google Drive/OAuth removed — local-only mode
 
 
 # --- MongoDB Setup ---
@@ -122,7 +122,7 @@ def create_account_interface():
 def delete_account(username):
 
     """Deletes a user's entire account and all associated data."""
-    from gdrive_utils import get_or_create_user_folder, list_user_files, delete_pdf_from_drive
+    # Drive-related operations removed; delete only Qdrant and MongoDB data in local mode
     from qdrant_client import QdrantClient
 
     st.info("🧹 Deleting all your data (MongoDB, Qdrant, and Google Drive)...")
@@ -151,26 +151,11 @@ def delete_account(username):
         except Exception as qe:
             st.warning(f"⚠️ Qdrant deletion error: {qe}")
 
-        # --- 2️⃣ Delete all PDFs from Google Drive ---
+        # --- 2️⃣ Local PDF cleanup skipped (no Drive integration) ---
         try:
-            drive_service = get_drive_service()
-            folder_id = get_or_create_user_folder(drive_service, username)
-            user_files = list_user_files(drive_service, username)
-            for f in user_files:
-                try:
-                    delete_pdf_from_drive(drive_service, f['id'], username=username)
-                    st.info(f"🗑 Deleted PDF: {f['name']}")
-                except Exception as de:
-                    st.warning(f"⚠️ Failed to delete Drive file {f['name']}: {de}")
-
-            # Delete the folder itself
-            try:
-                drive_service.files().delete(fileId=folder_id).execute()
-                st.info(f"🗂 Deleted Drive folder for user: {username}")
-            except Exception as fe:
-                st.warning(f"⚠️ Could not delete Drive folder: {fe}")
-        except Exception as e:
-            st.warning(f"⚠️ Drive deletion error: {e}")
+            st.info("ℹ️ Drive integration disabled; skipping remote PDF deletion.")
+        except Exception:
+            pass
 
         # --- 3️⃣ Delete from MongoDB ---
         try:
