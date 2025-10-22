@@ -245,15 +245,33 @@ def render_sidebar():
 
             # Build embeddings/index for this user's collection using in-memory bytes
             from embeddings_utils import build_or_load_index
+            import inspect
             if (
                 "vectordb" not in st.session_state
                 or st.session_state.vectordb is None
                 or st.session_state.PDF_NAME != user_collection_name
             ):
-                vectordb = build_or_load_index(collection_name=user_collection_name, pdf_bytes=pdf_bytes)
+                try:
+                    sig = inspect.signature(build_or_load_index)
+                    if "pdf_bytes" in sig.parameters:
+                        vectordb = build_or_load_index(collection_name=user_collection_name, pdf_bytes=pdf_bytes)
+                    else:
+                        # Fallback: use embeddings.build_index_from_pdf_bytes if available, then load collection
+                        try:
+                            from embeddings import build_index_from_pdf_bytes
+                            build_index_from_pdf_bytes(pdf_bytes, user_collection_name)
+                        except Exception:
+                            pass
+                        vectordb = build_or_load_index(collection_name=user_collection_name)
+
+                except Exception as e:
+                    st.error(f"Failed to build or load PDF index: {e}")
+                    return
+
                 if vectordb is None:
                     st.error("Failed to build or load PDF index. Please check your PDF and try again.")
                     return
+
                 st.session_state.vectordb = vectordb
                 st.session_state.retriever = vectordb.as_retriever(search_kwargs={"k": 4})
                 st.session_state.PDF_NAME = user_collection_name
