@@ -152,7 +152,6 @@ def show_before_message_ui(send_message, selected_pdf):
         st.session_state.chat_started = True
         send_message()
         save_user_chats()  # <-- Save after user input
-        st.rerun()
     elif user_input:
         if not selected_pdf:
             st.error("Please select or upload a PDF before sending a message.")
@@ -161,7 +160,7 @@ def show_before_message_ui(send_message, selected_pdf):
         st.session_state.chat_started = True
         send_message()
         save_user_chats()  # <-- Save after user input
-        st.rerun()
+        # Avoid forcing a full rerun here — let Streamlit re-run naturally and preserve chat UI state
 
 def show_main_chat_input(send_message, selected_pdf):
     st.markdown(
