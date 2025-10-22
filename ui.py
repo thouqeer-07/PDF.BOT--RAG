@@ -304,7 +304,7 @@ def render_sidebar():
                     if st.session_state.get("selected_pdf") == pdf_name:
                         st.markdown(f"**{pdf_name}** ✅")
                     else:
-                        if st.button(pdf_name, key=f"select_{pdf_name}"):
+                        if st.button(pdf_name, key=f"select_{username}__{user_collection_name}__{i}"):
                             if user_collection_name:
                                 st.session_state.current_collection = user_collection_name
                                 from embeddings_utils import build_or_load_index
@@ -325,7 +325,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
+                    if st.button("🗑️", key=f"remove_{username}__{user_collection_name}__{i}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
 
@@ -346,114 +346,6 @@ def render_sidebar():
                                         _time.sleep(0.5)
                             except Exception as e:
                                 print(f"[ERROR] Failed to delete Qdrant collection '{user_collection_name}': {e}")
-
-                        # Remove from user_collections
-                        if user_collection_name in st.session_state.get('user_collections', []):
-                            st.session_state['user_collections'].remove(user_collection_name)
-
-                        # Remove chat history for this PDF from session
-                        if pdf_name in st.session_state.get('pdf_chats', {}):
-                            del st.session_state['pdf_chats'][pdf_name]
-
-                        # Remove from pdf_history
-                        st.session_state['pdf_history'] = [
-                            pdf for pdf in st.session_state.get('pdf_history', [])
-                            if not (pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name)
-                        ]
-
-                        # Remove from MongoDB for this user
-                        user_data = chats_col.find_one({"username": username})
-                        if user_data:
-                            pdf_chats = user_data.get("pdf_chats", {})
-                            pdf_chats.pop(pdf_name, None)
-                            user_collections = user_data.get("user_collections", [])
-                            user_collections = [col for col in user_collections if col != user_collection_name]
-                            pdf_history = user_data.get("pdf_history", [])
-                            pdf_history = [pdf for pdf in pdf_history if not (pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name)]
-                            chats_col.update_one(
-                                {"username": username},
-                                {"$set": {"pdf_chats": pdf_chats, "user_collections": user_collections, "pdf_history": pdf_history}}
-                            )
-
-                        if st.session_state.get("selected_pdf") == pdf_name:
-                            st.session_state["selected_pdf"] = None
-                        st.success("🗑 PDF deleted!")
-                        st.rerun()
-        else:
-            st.info("No PDFs uploaded or indexed yet.")
-        # --- Sidebar PDF list ---
-        pdf_names = [
-            col.split("__", 1)[1]
-            for col in st.session_state.get('user_collections', [])
-            if col.startswith(f"{username}__")
-        ]
-
-        if pdf_names:
-            st.markdown("### 📚 Your Uploaded PDFs")
-            for i, pdf_name in enumerate(pdf_names):
-                user_collection_name = next(
-                    (col for col in st.session_state['user_collections']
-                     if col.startswith(f"{username}__{pdf_name}")),
-                    None
-                )
-                col1, col2 = st.columns([4, 2])
-                with col1:
-                    if st.session_state.get("selected_pdf") == pdf_name:
-                        st.markdown(f"**{pdf_name}** ✅")
-                    else:
-                        if st.button(pdf_name, key=f"select_{pdf_name}"):
-                            if user_collection_name:
-                                st.session_state.current_collection = user_collection_name
-                                from embeddings_utils import build_or_load_index
-                                st.session_state.vectordb = build_or_load_index(collection_name=user_collection_name)
-                                st.session_state.retriever = st.session_state.vectordb.as_retriever(search_kwargs={"k": 4})
-
-                            if 'pdf_chats' not in st.session_state:
-                                st.session_state['pdf_chats'] = {}
-                            if pdf_name not in st.session_state.pdf_chats:
-                                # try to restore from persisted MongoDB if available
-                                user_data = chats_col.find_one({"username": username})
-                                restored_chats = user_data.get("pdf_chats", {}).get(pdf_name, []) if user_data else []
-                                st.session_state.pdf_chats[pdf_name] = restored_chats if restored_chats is not None else []
-
-                            st.session_state.selected_pdf = pdf_name
-                            # Persist selection so reload preserves the correct chat mapping
-                            save_user_chats()
-                            st.rerun()
-
-                with col2:
-                    if st.button("🗑️", key=f"remove_{user_collection_name}_{pdf_name}_{i}"):
-                        from qdrant_client import QdrantClient
-                        from config import QDRANT_URL, QDRANT_API_KEY
-
-                        # Delete Qdrant collection
-                        if user_collection_name:
-                            try:
-                                qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-                                collections = qdrant.get_collections().collections
-                                collection_names = [c.name for c in collections]
-                                if user_collection_name in collection_names:
-                                    qdrant.delete_collection(collection_name=user_collection_name)
-                                    import time as _time
-                                    for _ in range(5):
-                                        collections = qdrant.get_collections().collections
-                                        collection_names = [c.name for c in collections]
-                                        if user_collection_name not in collection_names:
-                                            break
-                                        _time.sleep(0.5)
-                            except Exception as e:
-                                print(f"[ERROR] Failed to delete Qdrant collection '{user_collection_name}': {e}")
-
-                        # Local-only: remove any stored bytes for this PDF (no Drive delete)
-                        # file_bytes entries are stored under 'bytes' in pdf_history
-                        file_bytes_entry = next(
-                            (pdf for pdf in st.session_state.get('pdf_history', [])
-                             if pdf['name'] == pdf_name and pdf.get('collection') == user_collection_name),
-                            None
-                        )
-                        if file_bytes_entry and 'bytes' in file_bytes_entry:
-                            # nothing external to delete; just log removal
-                            pass
 
                         # Remove from user_collections
                         if user_collection_name in st.session_state.get('user_collections', []):
