@@ -81,8 +81,17 @@ def send_message():
         if not docs:
             bot_reply = "I couldn't find relevant information in the PDF."
         else:
-            context = "\n\n".join([d.page_content for d in docs])
-            print(f"[DEBUG] Context sent to LLM: {context[:500]}")
+            # Prefer to include metadata (page/source) to help the LLM ground answers
+            enriched_docs = []
+            for d in docs:
+                meta = getattr(d, "metadata", {}) or {}
+                page = meta.get("page")
+                source = meta.get("source")
+                header = f"[Source: {source} | Page: {page}]\n" if source or page else ""
+                enriched_docs.append(header + getattr(d, "page_content", str(d)))
+
+            context = "\n\n".join(enriched_docs)
+            print(f"[DEBUG] Context sent to LLM: {context[:1000]}")
             genai.configure(api_key=GOOGLE_API_KEY)
             model = genai.GenerativeModel("gemini-2.0-flash")
 
@@ -107,10 +116,16 @@ def send_message():
                 from prompts import get_prompt
                 prompt = get_prompt().format(context=context, question=user_input)
 
-            print(f"[DEBUG] Prompt sent to LLM: {prompt}")
-            response = model.generate_content(prompt)
-            print(f"[DEBUG] LLM response: {response.text.strip()}")
-            bot_reply = response.text.strip()
+            print(f"[DEBUG] Prompt sent to LLM (truncated): {prompt[:1000]}")
+            # Show spinner while generating
+            with st.spinner("Generating answer..."):
+                try:
+                    response = model.generate_content(prompt)
+                    print(f"[DEBUG] LLM response: {getattr(response, 'text', str(response))[:500]}")
+                    bot_reply = getattr(response, 'text', str(response)).strip()
+                except Exception as e:
+                    print(f"[ERROR] LLM generation failed: {e}")
+                    bot_reply = "Sorry, I couldn't generate a response at this time."
             
 
 

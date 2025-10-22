@@ -292,7 +292,7 @@ def render_sidebar():
         ]
 
         if pdf_names:
-            st.markdown("### 📚 Your Uploaded PDFs (local)")
+            st.markdown("### 📚 Your Uploaded PDFs")
             for i, pdf_name in enumerate(pdf_names):
                 user_collection_name = next(
                     (col for col in st.session_state['user_collections']
