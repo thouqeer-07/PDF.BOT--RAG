@@ -152,6 +152,13 @@ def show_before_message_ui(send_message, selected_pdf):
         st.session_state.chat_started = True
         send_message()
         save_user_chats()  # <-- Save after user input
+        # Ensure chat structures exist and immediately render the main chat input
+        if 'pdf_chats' not in st.session_state:
+            st.session_state['pdf_chats'] = {}
+        if selected_pdf not in st.session_state['pdf_chats']:
+            st.session_state['pdf_chats'][selected_pdf] = []
+        st.session_state.chat_started = True
+        show_main_chat_input(send_message, selected_pdf)
     elif user_input:
         if not selected_pdf:
             st.error("Please select or upload a PDF before sending a message.")
@@ -160,7 +167,13 @@ def show_before_message_ui(send_message, selected_pdf):
         st.session_state.chat_started = True
         send_message()
         save_user_chats()  # <-- Save after user input
-        # Avoid forcing a full rerun here — let Streamlit re-run naturally and preserve chat UI state
+        # Ensure chat structures exist and immediately render the main chat input
+        if 'pdf_chats' not in st.session_state:
+            st.session_state['pdf_chats'] = {}
+        if selected_pdf not in st.session_state['pdf_chats']:
+            st.session_state['pdf_chats'][selected_pdf] = []
+        st.session_state.chat_started = True
+        show_main_chat_input(send_message, selected_pdf)
 
 def show_main_chat_input(send_message, selected_pdf):
     st.markdown(

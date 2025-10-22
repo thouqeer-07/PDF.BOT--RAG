@@ -2,6 +2,7 @@ from langchain.prompts import PromptTemplate
 
 SYSTEM_PROMPT = (
     "You are a precise, professional, and concise assistant.\n"
+    "if they speak in native language respond in that language\n"
     "Always structure your response neatly using proper Markdown formatting.\n"
     "Avoid unnecessary symbols or raw formatting characters.\n"
     "If the answer is partially available, use what is known and note what is missing.\n"
