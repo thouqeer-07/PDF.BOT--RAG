@@ -131,7 +131,6 @@ def show_before_message_ui(send_message, selected_pdf):
 
     # Suggestions pills
     suggestions = [
-        "⬇️ Download PDF",
         "📘 What is the summary?",
         "✍️ Who is the author?",
         "💡 What are the key takeaways?",
@@ -583,44 +582,8 @@ def render_chat():
 
         # Bot response
         bot_content = chat['bot']
-        download_commands = [
-            "⬇️ download pdf",
-            "download pdf",
-            "get pdf",
-            "Show pdf",
-            "send pdf",
-            "download file",
-            "get file",
-            "send file",
-            "pdf download",
-            "please download pdf",
-            "can i download pdf",
-            "download the pdf",
-        ]
 
-        if chat['user'].strip().lower() in download_commands:
-            if file_bytes:
-                try:
-                    b64_pdf = base64.b64encode(file_bytes).decode()
-                    bot_content = f"Here is your PDF: <a href='data:application/pdf;base64,{b64_pdf}' download='{selected_pdf}' style='text-decoration:none; font-weight:bold;'>⬇️ {selected_pdf}</a>"
-                except Exception as e:
-                    bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> could not be prepared for download: {e}"
-            else:
-                bot_content = f"⚠️ Sorry, the PDF <b>{selected_pdf}</b> is not available for download."
-
-            st.markdown(
-                f"""
-                <div class='chat-row bot-row'>
-                    <div style='width:32px; height:32px; display:flex; text-align:left; align-items:center; justify-content:center; font-size:18px;' >
-                        <img src=\"data:image/png;base64,{bot_icon_base64}\" style=\"width:32px; height:32px;\" />
-                    </div>
-                    <div class='chat-bubble bot-msg'>{bot_content}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        elif i == len(chats) - 1 and not chat.get("animated", False):
+        if i == len(chats) - 1 and not chat.get("animated", False):
             # Show 'Bot is thinking...' interface before typewriter effect
             thinking_container = st.empty()
             thinking_container.markdown(

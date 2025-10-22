@@ -11,7 +11,4 @@ QDRANT_API_KEY = st.secrets["QDRANT_API_KEY"]
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 MONGO_URI = st.secrets["MONGO_URI"]
 COLLECTION_NAME = st.secrets.get("COLLECTION_NAME", "default_collection")
-File = st.secrets.get("file_id")
-
-# === Google OAuth credentials (for personal Drive) ===
-# CLIENT_SECRETS_JSON = os.getenv("CLIENT_SECRETS_JSON")  # optional for local testing
+# Remove Drive file id / OAuth secrets — app runs in local-only, in-memory mode

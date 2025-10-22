@@ -69,13 +69,7 @@ def login_interface():
                     st.session_state["authenticated"] = True
                     st.session_state["username"] = user_doc["username"]
                     st.session_state["persist_username"] = user_doc["username"] # Persist username for session
-                    # Reload Google Drive credentials from MongoDB
-                    google_creds = user_doc.get("google_creds")
-                    google_oauth_data = user_doc.get("google_oauth_data")
-                    if google_creds:
-                        st.session_state["google_creds"] = google_creds
-                    if google_oauth_data:
-                        st.session_state["google_oauth_data"] = google_oauth_data
+                    # Google Drive / OAuth removed — no credentials are loaded
                     st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
                     load_user_chats()
                     st.rerun()
