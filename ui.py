@@ -215,7 +215,7 @@ def render_sidebar():
     db = client["pdfbot"]
     chats_col = db["users"]
     with st.sidebar:
-        st.markdown("### 📄 Upload a PDF (local only)")
+        st.markdown("### 📄 Upload a PDF ")
         uploaded_pdf = st.file_uploader("Choose a PDF file to upload", type=["pdf"], key="pdf_uploader")
         upload_clicked = st.button("Upload", key="upload_pdf_button")
         if uploaded_pdf and upload_clicked:
@@ -254,7 +254,7 @@ def render_sidebar():
                 try:
                     sig = inspect.signature(build_or_load_index)
                     if "pdf_bytes" in sig.parameters:
-                        vectordb = build_or_load_index(collection_name=user_collection_name, pdf_bytes=pdf_bytes)
+                        vectordb = build_or_load_index(collection_name=user_collection_name, pdf_bytes=pdf_bytes, use_sidebar=True)
                     else:
                         # Fallback: use embeddings.build_index_from_pdf_bytes if available, then load collection
                         try:
@@ -282,7 +282,7 @@ def render_sidebar():
                 st.session_state['pdf_chats'] = {}
             st.session_state.pdf_chats[pdf_name] = []
             save_user_chats()
-            st.success(f"PDF '{pdf_name}' uploaded and indexed locally!", icon="✅")
+            st.success(f"PDF '{pdf_name}' uploaded and indexed!", icon="✅")
 
         # --- Sidebar PDF list ---
         pdf_names = [
