@@ -1,6 +1,6 @@
-# 📄 PDF.BOT — AI-Powered PDF Assistant  
+# 📄 PDF BOT — AI-Powered PDF Assistant  
 
-An AI chatbot that lets users **upload PDFs**, store them in **Google Drive**, and **chat with their documents** using **Google Generative AI** and **LangChain RAG**.  
+An AI chatbot that lets users **upload PDFs**, store them in **Google Drive**, and **chat with their documents** using **RAG Pipeline** and **Google Generative AI**   
 
 ---
 
@@ -24,7 +24,7 @@ An AI chatbot that lets users **upload PDFs**, store them in **Google Drive**, a
 
 ## 🧠 How It Works  
 
-1. User logs in via.
+1. User Creats account and login.
 2. Doing OAuth For Connecting with Google Drive.  
 3. Uploads a **PDF**, stored securely in Google Drive.  
 4. Text is extracted → embeddings generated via **Google Generative AI**.  
