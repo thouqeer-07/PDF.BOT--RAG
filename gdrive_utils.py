@@ -154,7 +154,7 @@ def get_drive_service():
             st.session_state["drive_connected"] = True
 
             #st.success("✅ Google Drive connected successfully!")
-            st.success("Go Back to the main app to continue.")
+            st.success("Go Back to the main app and refresh to continue.")
             print(f"[DEBUG] OAuth success for {username}")
             st.rerun()
             return build("drive", "v3", credentials=creds)
