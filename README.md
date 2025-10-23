@@ -25,7 +25,7 @@ An AI chatbot that lets users **upload PDFs**, store them in **Google Drive**, a
 ## 🧠 How It Works  
 
 1. User Creats account and login.
-2. Doing OAuth For Connecting with Google Drive.  
+2. Doing OAuth For Connecting securely with Google Drive.  
 3. Uploads a **PDF**, stored securely in Google Drive.  
 4. Text is extracted → embeddings generated via **Google Generative AI**.  
 5. Embeddings stored in **Qdrant** for retrieval.  
