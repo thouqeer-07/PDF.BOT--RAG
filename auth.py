@@ -7,7 +7,7 @@ from pymongo import MongoClient
 from ui import load_user_chats, save_user_chats
 from qdrant_client import QdrantClient
 from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
-from gdrive_utils import get_drive_service, download_pdf_from_drive
+# gdrive_utils functions are imported defensively inside delete_account
 
 
 # --- MongoDB Setup ---
@@ -122,10 +122,16 @@ def create_account_interface():
 def delete_account(username):
 
     """Deletes a user's entire account and all associated data."""
-    from gdrive_utils import get_or_create_user_folder, list_user_files, delete_pdf_from_drive
+    # Try to import Drive helpers; if unavailable, proceed without Drive steps
+    try:
+        from gdrive_utils import get_or_create_user_folder, list_user_files, delete_pdf_from_drive, get_drive_service
+        drive_helpers_available = True
+    except Exception:
+        drive_helpers_available = False
+
     from qdrant_client import QdrantClient
 
-    st.info("🧹 Deleting all your data (MongoDB, Qdrant, and Google Drive)...")
+    st.info("🧹 Deleting all your data (MongoDB and Qdrant). Drive files will be removed if Drive is connected.")
 
     try:
         # --- Load user data from MongoDB ---
@@ -151,26 +157,33 @@ def delete_account(username):
         except Exception as qe:
             st.warning(f"⚠️ Qdrant deletion error: {qe}")
 
-        # --- 2️⃣ Delete all PDFs from Google Drive ---
+        # --- 2️⃣ Delete all PDFs from Google Drive (only if helpers available and user actually connected Drive) ---
         try:
-            drive_service = get_drive_service()
-            folder_id = get_or_create_user_folder(drive_service, username)
-            user_files = list_user_files(drive_service, username)
-            for f in user_files:
+            user_google_creds = user_data.get("google_creds") or user_data.get("google_oauth_data")
+            if drive_helpers_available and user_google_creds:
                 try:
-                    delete_pdf_from_drive(drive_service, f['id'], username=username)
-                    st.info(f"🗑 Deleted PDF: {f['name']}")
-                except Exception as de:
-                    st.warning(f"⚠️ Failed to delete Drive file {f['name']}: {de}")
+                    drive_service = get_drive_service()
+                    folder_id = get_or_create_user_folder(drive_service, username)
+                    user_files = list_user_files(drive_service, username)
+                    for f in user_files:
+                        try:
+                            delete_pdf_from_drive(drive_service, f['id'], username=username)
+                            st.info(f"🗑 Deleted Drive PDF: {f['name']}")
+                        except Exception as de:
+                            st.warning(f"⚠️ Failed to delete Drive file {f['name']}: {de}")
 
-            # Delete the folder itself
-            try:
-                drive_service.files().delete(fileId=folder_id).execute()
-                st.info(f"🗂 Deleted Drive folder for user: {username}")
-            except Exception as fe:
-                st.warning(f"⚠️ Could not delete Drive folder: {fe}")
+                    # Delete the folder itself (best-effort)
+                    try:
+                        drive_service.files().delete(fileId=folder_id).execute()
+                        st.info(f"🗂 Deleted Drive folder for user: {username}")
+                    except Exception as fe:
+                        st.warning(f"⚠️ Could not delete Drive folder: {fe}")
+                except Exception as de_all:
+                    st.warning(f"⚠️ Drive deletion error: {de_all}")
+            else:
+                st.info("No Google Drive credentials found for this user or Drive helpers unavailable; skipping Drive deletion.")
         except Exception as e:
-            st.warning(f"⚠️ Drive deletion error: {e}")
+            st.warning(f"⚠️ Drive deletion unexpected error: {e}")
 
         # --- 3️⃣ Delete from MongoDB ---
         try:
