@@ -3,6 +3,20 @@ import streamlit as st
 from embeddings_utils import build_or_load_index
 from chat_handler import send_message
 import ui
+import streamlit as st
+import streamlit as st
+from gdrive_utils import get_drive_service
+
+if "code" in st.query_params:
+    # This runs only on OAuth redirect
+    st.title("Connecting to Google Drive...")
+    service = get_drive_service()
+    st.success("✅ Google Drive connected successfully!")
+    st.success("Go Back to the main app and refresh to continue.")
+    st.stop()
+    st.rerun()
+
+
 from ui import setup_ui, render_sidebar, render_chat, render_main_ui
 print("[DEBUG] Starting app.py")
 from auth import require_login

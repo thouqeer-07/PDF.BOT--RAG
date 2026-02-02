@@ -93,7 +93,7 @@ def send_message():
             context = "\n\n".join(enriched_docs)
             print(f"[DEBUG] Context sent to LLM: {context[:1000]}")
             genai.configure(api_key=GOOGLE_API_KEY)
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            model = genai.GenerativeModel("gemini-2.5-flash")
 
             # If MCQ, try to extract explicit options from the user's input
             option_text = ""
