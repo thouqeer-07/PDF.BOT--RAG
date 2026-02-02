@@ -3,18 +3,15 @@
 import streamlit as st
 import os  # Only for non-file ops
 import base64
-from pymongo import MongoClient
+
 from ui import load_user_chats, save_user_chats
 from qdrant_client import QdrantClient
-from config import QDRANT_URL, QDRANT_API_KEY , MONGO_URI
+from config import QDRANT_URL, QDRANT_API_KEY
 # gdrive_utils functions are imported defensively inside delete_account
 
 
 # --- MongoDB Setup ---
-client = MongoClient(MONGO_URI)
-db = client["pdfbot"]
-users_col = db["users"]
-chats_col = db["users"]
+from mongo_driver import client, db, users_col, chats_col
 st.set_page_config(layout="wide")
 
 # --- Convert image to base64 ---
@@ -129,8 +126,8 @@ def delete_account(username):
 
     try:
         # --- Load user data from MongoDB ---
-        db = client["pdfbot"]
-        users_col = db["users"]  # ✅ This is the actual collection used in your app
+        # --- Load user data from MongoDB ---
+        from mongo_driver import db, users_col
         user_data = users_col.find_one({"username": username})
 
         if not user_data:

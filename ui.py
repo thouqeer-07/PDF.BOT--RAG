@@ -3,12 +3,7 @@
 import streamlit as st
 import time
 import base64
-from pymongo import MongoClient
-from config import MONGO_URI
-# Local-only PDF handling: no Google Drive / OAuth required
-client = MongoClient(MONGO_URI)
-db = client["pdfbot"]
-chats_col = db["users"]
+from mongo_driver import client, db, chats_col
 
 
 
@@ -221,11 +216,8 @@ def setup_ui():
 def render_sidebar():
     username = st.session_state.get("username", "guest")
     # Ensure MongoDB collection handle is always available
-    from pymongo import MongoClient
-    from config import MONGO_URI
-    client = MongoClient(MONGO_URI)
-    db = client["pdfbot"]
-    chats_col = db["users"]
+    # Ensure MongoDB collection handle is always available
+    from mongo_driver import client, db, chats_col
     with st.sidebar:
         st.markdown("### 📄 Upload a PDF ")
         uploaded_pdf = st.file_uploader("Choose a PDF file to upload", type=["pdf"], key="pdf_uploader")

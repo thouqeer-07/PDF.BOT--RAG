@@ -29,16 +29,13 @@ from config import OAUTH_PORT
 def get_drive_service():
 
     """Handles Google OAuth (Streamlit + MongoDB compatible) and returns authorized Drive service."""
-    from pymongo import MongoClient
+    from mongo_driver import client, db, chats_col
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import Flow, InstalledAppFlow
     from googleapiclient.discovery import build
     import json, urllib.parse, os
 
-    from config import MONGO_URI, SCOPES, REDIRECT_URI, OAUTH_PORT
-    client = MongoClient(MONGO_URI)
-    db = client["pdfbot"]
-    chats_col = db["users"]
+    from config import SCOPES, REDIRECT_URI, OAUTH_PORT
 
     username = st.session_state.get("username") or st.session_state.get("persist_username")
     # Try to restore username from OAuth 'state' param if missing
