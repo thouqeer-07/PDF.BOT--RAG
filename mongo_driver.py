@@ -14,8 +14,8 @@ try:
     db = client["pdfbot"]
     
     # Common collections used across the app
-    users_col = db["users"]
-    chats_col = db["users"] # In the original code, chats_col was also db["users"]
+    users_col = db["Test users"]
+    chats_col = db["Test users"] # In the original code, chats_col was also db["users"]
 
     print("[INFO] MongoDB connected successfully.")
 except Exception as e:
