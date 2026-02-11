@@ -227,7 +227,7 @@ def require_login():
                         st.session_state["email"] = current_email
                 
                 if current_email:
-                    st.write(f"📧 Email: {current_email}")
+                    st.markdown(f"<div>📧 Email: {current_email}</div>", unsafe_allow_html=True)
 
                 # Logout button
                 if st.button("🚪 Logout"):
