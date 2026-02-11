@@ -226,7 +226,7 @@ def render_sidebar():
             pdf_name = uploaded_pdf.name
             pdf_bytes = uploaded_pdf.read()
 
-            user_collection_name = f"{username}__{pdf_name}"
+            user_collection_name = f"open_{username}__{pdf_name}"
             # Check if this PDF already exists in user_collections
             if user_collection_name in st.session_state.get('user_collections', []):
                 st.session_state.selected_pdf = pdf_name
@@ -292,7 +292,7 @@ def render_sidebar():
         pdf_names = [
             col.split("__", 1)[1]
             for col in st.session_state.get('user_collections', [])
-            if col.startswith(f"{username}__")
+            if col.startswith(f"open_{username}__")
         ]
 
         if pdf_names:
@@ -300,7 +300,7 @@ def render_sidebar():
             for i, pdf_name in enumerate(pdf_names):
                 user_collection_name = next(
                     (col for col in st.session_state['user_collections']
-                     if col.startswith(f"{username}__{pdf_name}")),
+                     if col.startswith(f"open_{username}__{pdf_name}")),
                     None
                 )
                 col1, col2 = st.columns([4, 2])
@@ -308,7 +308,7 @@ def render_sidebar():
                     if st.session_state.get("selected_pdf") == pdf_name:
                         st.markdown(f"**{pdf_name}** ✅")
                     else:
-                        if st.button(pdf_name, key=f"select_{username}__{user_collection_name}__{i}"):
+                        if st.button(pdf_name, key=f"select_open_{username}__{user_collection_name}__{i}"):
                             if user_collection_name:
                                 st.session_state.current_collection = user_collection_name
                                 from embeddings_utils import build_or_load_index
@@ -329,7 +329,7 @@ def render_sidebar():
                             st.rerun()
 
                 with col2:
-                    if st.button("🗑️", key=f"remove_{username}__{user_collection_name}__{i}"):
+                    if st.button("🗑️", key=f"remove_open_{username}__{user_collection_name}__{i}"):
                         from qdrant_client import QdrantClient
                         from config import QDRANT_URL, QDRANT_API_KEY
 

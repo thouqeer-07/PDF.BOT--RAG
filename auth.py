@@ -65,6 +65,7 @@ def login_interface():
                 if user_doc and user_doc.get("password") == password:
                     st.session_state["authenticated"] = True
                     st.session_state["username"] = user_doc["username"]
+                    st.session_state["email"] = user_doc["email"]  # Store email
                     st.session_state["persist_username"] = user_doc["username"] # Persist username for session
                     # Google Drive / OAuth removed — no credentials are loaded
                     st.success(f"🎉 Login successful! Welcome, {user_doc['username']}")
@@ -215,6 +216,18 @@ def require_login():
             show_settings = st.checkbox("⚙️ Settings")
 
             if show_settings:
+                
+                # Retrieve email if not already in session
+                current_email = st.session_state.get("email")
+                if not current_email:
+                    # Fetch from DB if missing (e.g. from existing session)
+                    u_doc = get_user_by_username(username)
+                    if u_doc:
+                        current_email = u_doc.get("email")
+                        st.session_state["email"] = current_email
+                
+                if current_email:
+                    st.info(f"📧 Email: {current_email}")
 
                 # Logout button
                 if st.button("🚪 Logout"):

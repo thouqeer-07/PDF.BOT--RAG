@@ -35,7 +35,7 @@ if selected_pdf and username:
     # Find the correct collection for this user and selected PDF
     user_collections = st.session_state.get("user_collections", [])
     collection_name = next(
-        (col for col in user_collections if col.startswith(f"{username}__{selected_pdf}")), 
+        (col for col in user_collections if col.startswith(f"open_{username}__{selected_pdf}")), 
         None
     )
 
