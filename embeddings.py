@@ -48,7 +48,7 @@ print(f"📑 Prepared {len(docs)} chunks with overlap...")
 
 # 4. Initialize embeddings (Google Generative AI)
 embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",
+    model="models/gemini-embedding-001",
     api_key=GOOGLE_API_KEY
 )
 
