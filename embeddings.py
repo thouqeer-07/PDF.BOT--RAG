@@ -60,7 +60,7 @@ def build_index_from_pdf_bytes(pdf_bytes: bytes, collection_name: str) -> None:
         })
 
     # 3. Initialize embeddings (Google Generative AI)
-    embeddings = GoogleGenerativeAIEmbeddings(model="text-embedding-004", api_key=GOOGLE_API_KEY)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", api_key=GOOGLE_API_KEY)
 
     # 4. Connect to Qdrant
     qdrant = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
