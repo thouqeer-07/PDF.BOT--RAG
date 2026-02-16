@@ -19,7 +19,7 @@ def build_or_load_index(collection_name=None, pdf_path=None):
 
     try:
         embedding_model = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             api_key=GOOGLE_API_KEY
         )
 
